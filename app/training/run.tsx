@@ -3,6 +3,7 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View, ImageBackground } f
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { colors, font, radius, spacing } from '@/theme/tokens';
 import { getActivePlan } from '@/db/plans';
@@ -331,12 +332,12 @@ export default function TrainingRunScreen() {
       <View style={{ flex: 1 }}>
         <Screen scroll={false} transparent={true}>
           <WorkoutBackground />
-          <View style={styles.topBar}>
-            <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
-              <Text style={styles.navBackIcon}>←</Text>
-              <Text style={styles.navBackText}>返回</Text>
-            </Pressable>
-          </View>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
+            <Ionicons name="chevron-back" size={20} color={colors.text} style={{ marginRight: 2 }} />
+            <Text style={styles.navBackText}>返回</Text>
+          </Pressable>
+        </View>
           <View style={styles.centerWrap}>
             <Text style={{ fontSize: 60, marginBottom: spacing.md }}>🏸</Text>
             <Text style={styles.title}>本次训练共 {items.length} 项</Text>
@@ -355,12 +356,12 @@ export default function TrainingRunScreen() {
       <View style={{ flex: 1 }}>
         <Screen scroll={false} transparent={true}>
           <WorkoutBackground />
-          <View style={styles.topBar}>
-            <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
-              <Text style={styles.navBackIcon}>←</Text>
-              <Text style={styles.navBackText}>返回</Text>
-            </Pressable>
-          </View>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
+            <Ionicons name="chevron-back" size={20} color={colors.text} style={{ marginRight: 2 }} />
+            <Text style={styles.navBackText}>返回</Text>
+          </Pressable>
+        </View>
           <View style={styles.centerWrap}>
             <Text style={{ fontSize: 60, marginBottom: spacing.md }}>🎉</Text>
             <Text style={styles.title}>训练完成！</Text>
@@ -388,6 +389,10 @@ export default function TrainingRunScreen() {
         <WorkoutBackground />
         <View style={styles.runContainer}>
         <View style={styles.topBar}>
+          <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
+            <Ionicons name="chevron-back" size={20} color={colors.text} style={{ marginRight: 2 }} />
+            <Text style={styles.navBackText}>返回</Text>
+          </Pressable>
           <Text style={styles.progressText}>
             已完成 {currentIndex} 个，共 {items.length} 个
           </Text>
@@ -444,18 +449,18 @@ export default function TrainingRunScreen() {
           <View style={styles.controls}>
             <Pressable style={styles.iconBtn} onPress={exitWorkout}>
               <View style={[styles.roundSmallBtn, { backgroundColor: colors.danger }]}>
-                <Text style={styles.roundSmallBtnText}>■</Text>
+                <Ionicons name="stop" size={24} color="#fff" />
               </View>
               <Text style={styles.iconBtnLabel}>结束</Text>
             </Pressable>
             
             <Pressable style={styles.playPauseBtn} onPress={togglePause}>
-              <Text style={styles.playPauseIcon}>{status === 'running' ? '⏸' : '▶'}</Text>
+              <Ionicons name={status === 'running' ? 'pause' : 'play'} size={36} color="#fff" style={{ marginLeft: status === 'running' ? 0 : 4 }} />
             </Pressable>
             
             <Pressable style={styles.iconBtn} onPress={nextItemManually}>
               <View style={[styles.roundSmallBtn, { backgroundColor: colors.cardAlt }]}>
-                <Text style={styles.roundSmallBtnText}>⏭</Text>
+                <Ionicons name="play-skip-forward" size={24} color="#fff" />
               </View>
               <Text style={styles.iconBtnLabel}>跳过</Text>
             </Pressable>
@@ -504,7 +509,6 @@ const styles = StyleSheet.create({
   bgmMenuItemActive: { backgroundColor: colors.card },
   bgmMenuText: { color: colors.text, fontSize: font.body, textAlign: 'center' },
   navBackBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
-  navBackIcon: { color: colors.text, fontSize: 18, marginRight: 4, marginTop: -2 },
   navBackText: { color: colors.text, fontSize: font.small, fontWeight: '600' },
   mainBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.lg, zIndex: 1 },
   categoryTag: { color: colors.primary, fontSize: font.body, fontWeight: '700', marginBottom: spacing.md },
@@ -518,9 +522,7 @@ const styles = StyleSheet.create({
   controls: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl },
   iconBtn: { alignItems: 'center', width: 60 },
   roundSmallBtn: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
-  roundSmallBtnText: { color: '#fff', fontSize: 20 },
   iconBtnLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 8 },
   playPauseBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-  playPauseIcon: { color: '#fff', fontSize: 36, marginLeft: 4 },
 });
 

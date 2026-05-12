@@ -13,7 +13,7 @@ export function Screen({
   transparent?: boolean;
 }) {
   return (
-    <SafeAreaView style={[styles.safe, transparent && { backgroundColor: 'transparent' }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, transparent && { backgroundColor: 'transparent' }]} edges={['top', 'bottom']}>
       {scroll ? (
         <ScrollView
           contentContainerStyle={styles.content}
