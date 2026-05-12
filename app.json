@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "羽毛球训练",
+    "slug": "badminton-trainer",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "badminton",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.you.badmintontrainer",
+      "infoPlist": {
+        "NSCameraUsageDescription": "需要使用摄像头进行动作识别与录像复盘",
+        "NSMicrophoneUsageDescription": "录像复盘时需要录音",
+        "NSPhotoLibraryUsageDescription": "用于导入对战录像"
+      }
+    },
+    "android": {
+      "package": "com.you.badmintontrainer",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "需要使用摄像头识别羽毛球动作",
+          "enableMicrophonePermission": true,
+          "microphonePermissionText": "录像复盘时需要录音"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#10B981"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

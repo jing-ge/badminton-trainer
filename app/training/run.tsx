@@ -1,0 +1,526 @@
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Platform, Pressable, StyleSheet, Text, View, ImageBackground } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
+import { Screen } from '@/components/Screen';
+import { colors, font, radius, spacing } from '@/theme/tokens';
+import { getActivePlan } from '@/db/plans';
+import { selectToday } from '@/data/selectToday';
+import type { TrainingItem, TrainingModule } from '@/data/planTypes';
+
+import { defaultPlans } from '@/data/presets';
+
+const BGM_LIST = [
+  { id: 'electronic', name: '动感电子', file: require('@/../assets/sounds/bgm_electronic.mp3') },
+  { id: 'relax', name: '轻松纯音', file: require('@/../assets/sounds/bgm_relax.mp3') },
+  { id: 'epic', name: '史诗激昂', file: require('@/../assets/sounds/bgm_epic.mp3') },
+  { id: 'none', name: '无音乐', file: null }
+];
+
+export default function TrainingRunScreen() {
+  const { mid, plan_id } = useLocalSearchParams<{ mid?: string; plan_id?: string }>();
+  const router = useRouter();
+
+  const [bgmIndex, setBgmIndex] = useState(0); // 默认 0 (动感电子)
+  const [showBgmMenu, setShowBgmMenu] = useState(false);
+
+  const [items, setItems] = useState<TrainingItem[]>([]);
+  const [totalMin, setTotalMin] = useState(0);
+  const [planId, setPlanId] = useState('');
+
+  const currentIndexRef = useRef(0);
+  const [currentIndex, setCurrentIndexState] = useState(0);
+
+  function setCurrentIndex(idx: number) {
+    currentIndexRef.current = idx;
+    setCurrentIndexState(idx);
+  }
+
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [status, setStatus] = useState<'idle' | 'running' | 'paused' | 'finished'>('idle');
+
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // 背景音乐引用
+  const bgmSoundRef = useRef<Audio.Sound | null>(null);
+
+  // 加载特定 BGM
+  async function loadBgm(index: number, currentStatus: string) {
+    if (bgmSoundRef.current) {
+      await bgmSoundRef.current.unloadAsync();
+      bgmSoundRef.current = null;
+    }
+    const bgm = BGM_LIST[index];
+    if (bgm.file) {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          bgm.file,
+          { shouldPlay: currentStatus === 'running', isLooping: true, volume: 0.15 }
+        );
+        bgmSoundRef.current = sound;
+        if (currentStatus === 'running') {
+          await bgmSoundRef.current.playAsync();
+        }
+      } catch (e) {
+        console.log('BGM load failed:', e);
+      }
+    }
+  }
+
+  // 初次加载和切换时触发
+  useEffect(() => {
+    loadBgm(bgmIndex, status);
+  }, [bgmIndex]);
+
+  useEffect(() => {
+    (async () => {
+      const plan = await getActivePlan();
+      setPlanId(plan.id);
+      let targetModules: TrainingModule[] = [];
+      
+      if (mid) {
+        // 先在当前激活计划找
+        let m = plan.modules.find((x) => x.id === mid);
+        // 找不到，且如果传了 plan_id，去预置计划里找
+        if (!m && plan_id) {
+          const fallbackPlan = defaultPlans.find((p) => p.id === plan_id);
+          if (fallbackPlan) {
+            m = fallbackPlan.modules.find((x) => x.id === mid);
+            setPlanId(fallbackPlan.id);
+          }
+        }
+        if (m) targetModules = [m];
+      } else {
+        targetModules = selectToday(plan).modules;
+      }
+
+      const flatItems = targetModules.flatMap((m) => m.items);
+      setItems(flatItems);
+      setTotalMin(flatItems.reduce((acc, it) => acc + it.duration_min, 0));
+    })();
+    
+    return () => {
+      stopTimer();
+      Speech.stop();
+      if (bgmSoundRef.current) {
+        bgmSoundRef.current.unloadAsync();
+      }
+    };
+  }, [mid]);
+
+  useEffect(() => {
+    if (status === 'running' && timeLeft > 0) {
+      bgmSoundRef.current?.playAsync();
+
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            handleItemFinish();
+            return 0;
+          }
+          
+          const currentItem = items[currentIndexRef.current];
+          const totalSec = currentItem.duration_min * 60;
+          const elapsed = totalSec - prev;
+          
+          runGhostCoach(currentItem, prev, elapsed);
+          
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      bgmSoundRef.current?.pauseAsync();
+      stopTimer();
+    }
+    return stopTimer;
+  }, [status, timeLeft]);
+
+  function stopTimer() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+  }
+
+  function speak(text: string, rate: number = 1.0) {
+    Speech.stop();
+    Speech.speak(text, { language: 'zh-CN', rate });
+  }
+
+  function runGhostCoach(item: TrainingItem, timeLeftSec: number, elapsed: number) {
+    if (timeLeftSec === 11) {
+      speak('当前动作最后十秒');
+      return;
+    }
+    if (timeLeftSec <= 10) return; // 倒数 10 秒留给结束
+    if (elapsed <= 5) return; // 开场前 5 秒留给名称播报
+
+    const adjElapsed = elapsed - 5;
+
+    // 1. 匹配「次数/个数」：例如 "波比跳 4x15个"
+    const matchReps = item.name.match(/(\d+)\s*[x×*]\s*(\d+)\s*(个|次)/);
+    if (matchReps) {
+      const sets = parseInt(matchReps[1], 10);
+      const reps = parseInt(matchReps[2], 10);
+      const repTime = 3; // 默认一个动作 3 秒
+      const restTime = 30; // 默认休息 30 秒
+      const cycleTime = reps * repTime + restTime;
+
+      const currentSet = Math.floor(adjElapsed / cycleTime) + 1;
+      const t = adjElapsed % cycleTime;
+
+      if (currentSet <= sets) {
+        if (t === 0 && currentSet > 1) {
+          speak(`第 ${currentSet} 组，开始`);
+        } else if (t < reps * repTime) {
+          // 工作期：计数
+          if (t % repTime === 0) {
+            const rep = Math.floor(t / repTime) + 1;
+            if (rep <= reps) speak(rep.toString(), 1.5);
+            if (rep === reps) setTimeout(() => speak('好，休息三十秒'), 1500);
+          }
+        } else {
+          // 休息期：倒计时
+          const restLeft = cycleTime - t;
+          if (restLeft <= 3 && restLeft > 0) speak(restLeft.toString(), 1.5);
+        }
+        return; // 被精细正则接管后，跳过兜底逻辑
+      }
+    }
+
+    // 2. 匹配「按秒分组」：例如 "六点步法 5x30秒"
+    const matchTime = item.name.match(/(\d+)\s*[x×*]\s*(\d+)\s*(秒)/);
+    if (matchTime) {
+      const sets = parseInt(matchTime[1], 10);
+      const workSec = parseInt(matchTime[2], 10);
+      const restTime = 30;
+      const cycleTime = workSec + restTime;
+
+      const currentSet = Math.floor(adjElapsed / cycleTime) + 1;
+      const t = adjElapsed % cycleTime;
+
+      if (currentSet <= sets) {
+        if (t === 0 && currentSet > 1) {
+          speak(`第 ${currentSet} 组，开始`);
+        } else if (t < workSec) {
+          // 工作期
+          const workLeft = workSec - t;
+          if (workLeft === Math.floor(workSec / 2)) speak('过半了，坚持住');
+          if (workLeft <= 3 && workLeft > 0) speak(workLeft.toString(), 1.5);
+          if (workLeft === 1) setTimeout(() => speak('好，休息三十秒'), 1500);
+          
+          // 在时间组内，如果是步法，继续播报随机点
+          if (workLeft > 3 && workLeft % 3 === 0 && item.name.includes('六点')) {
+            const pts = ['左前网', '右前网', '左后退', '右后退', '左接杀', '右接杀'];
+            speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
+          } else if (workLeft > 3 && workLeft % 4 === 0 && item.name.includes('四方')) {
+            const pts = ['左前', '右前', '左后', '右后'];
+            speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
+          }
+        } else {
+          // 休息期
+          const restLeft = cycleTime - t;
+          if (restLeft === 10) speak('准备下一组');
+          if (restLeft <= 3 && restLeft > 0) speak(restLeft.toString(), 1.5);
+        }
+        return;
+      }
+    }
+
+    // 3. 兜底逻辑：普通的没写组数的动作
+    if (item.name.includes('六点') && timeLeftSec % 3 === 0) {
+      const pts = ['左前网', '右前网', '左后退', '右后退', '左接杀', '右接杀'];
+      speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
+    } else if (item.name.includes('四方') && timeLeftSec % 4 === 0) {
+      const pts = ['左前', '右前', '左后', '右后'];
+      speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
+    } else if (item.category === 'fitness' && timeLeftSec % 15 === 0) {
+      const pts = ['坚持住', '注意呼吸', '保持节奏', '核心收紧', '发力'];
+      speak(pts[Math.floor(Math.random() * pts.length)], 1.2);
+    } else if (item.category === 'tech') {
+      if (timeLeftSec % 3 === 0) {
+        const beat = Math.floor(elapsed / 3) % 4 + 1;
+        speak(beat.toString(), 1.5);
+      } else if (timeLeftSec % 20 === 0) {
+        const pts = ['注意动作完整', '体会发力', '回中要快', '盯住球'];
+        speak(pts[Math.floor(Math.random() * pts.length)], 1.2);
+      }
+    } else {
+      if (timeLeftSec % 30 === 0) speak('做得很好，继续保持');
+    }
+  }
+
+  function startWorkout() {
+    if (items.length === 0) return;
+    setStatus('running');
+    startItem(0);
+  }
+
+  function startItem(idx: number) {
+    const it = items[idx];
+    setCurrentIndex(idx);
+    setTimeLeft(it.duration_min * 60);
+    
+    let text = `准备开始：${it.name}，时长 ${it.duration_min} 分钟。`;
+    if (it.notes) text += `注意：${it.notes}`;
+    speak(text);
+  }
+
+  function handleItemFinish() {
+    stopTimer();
+    const nextIdx = currentIndexRef.current + 1;
+    if (nextIdx < items.length) {
+      speak('时间到。');
+      setTimeout(() => startItem(nextIdx), 1500);
+    } else {
+      setStatus('finished');
+      speak('恭喜你，已完成本次所有训练内容，太棒了！');
+    }
+  }
+
+  function nextItemManually() {
+    if (Platform.OS === 'web') {
+      const ok = window.confirm('你确定要提前结束当前动作进入下一项吗？');
+      if (ok) {
+        stopTimer();
+        handleItemFinish();
+      }
+      return;
+    }
+    Alert.alert('跳过此项？', '你确定要提前结束当前动作进入下一项吗？', [
+      { text: '取消', style: 'cancel' },
+      { text: '跳过', onPress: () => {
+          stopTimer();
+          handleItemFinish();
+        } 
+      }
+    ]);
+  }
+
+  function togglePause() {
+    if (status === 'running') {
+      setStatus('paused');
+      bgmSoundRef.current?.pauseAsync();
+      speak('训练已暂停');
+    } else if (status === 'paused') {
+      setStatus('running');
+      bgmSoundRef.current?.playAsync();
+      speak('继续训练');
+    }
+  }
+
+  function exitWorkout() {
+    if (Platform.OS === 'web') {
+      const ok = window.confirm('结束训练？记录将不会被保存');
+      if (ok) {
+        router.back();
+      }
+      return;
+    }
+    Alert.alert('结束训练？', '记录将不会被保存', [
+      { text: '继续练', style: 'cancel' },
+      { text: '直接退出', style: 'destructive', onPress: () => router.back() }
+    ]);
+  }
+
+  if (items.length === 0) {
+    return <Screen><Text style={{ color: colors.textDim }}>没有训练项</Text></Screen>;
+  }
+
+  if (status === 'idle') {
+    return (
+      <View style={{ flex: 1 }}>
+        <Screen scroll={false} transparent={true}>
+          <WorkoutBackground />
+          <View style={styles.topBar}>
+            <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
+              <Text style={styles.navBackIcon}>←</Text>
+              <Text style={styles.navBackText}>返回</Text>
+            </Pressable>
+          </View>
+          <View style={styles.centerWrap}>
+            <Text style={{ fontSize: 60, marginBottom: spacing.md }}>🏸</Text>
+            <Text style={styles.title}>本次训练共 {items.length} 项</Text>
+            <Text style={styles.meta}>预计需要 {totalMin} 分钟</Text>
+            <Pressable style={styles.startBtnBig} onPress={startWorkout}>
+              <Text style={styles.startBtnBigText}>▶ 开始跟练</Text>
+            </Pressable>
+          </View>
+        </Screen>
+      </View>
+    );
+  }
+
+  if (status === 'finished') {
+    return (
+      <View style={{ flex: 1 }}>
+        <Screen scroll={false} transparent={true}>
+          <WorkoutBackground />
+          <View style={styles.topBar}>
+            <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
+              <Text style={styles.navBackIcon}>←</Text>
+              <Text style={styles.navBackText}>返回</Text>
+            </Pressable>
+          </View>
+          <View style={styles.centerWrap}>
+            <Text style={{ fontSize: 60, marginBottom: spacing.md }}>🎉</Text>
+            <Text style={styles.title}>训练完成！</Text>
+            <Text style={styles.meta}>你坚持练完了 {totalMin} 分钟的内容</Text>
+            <Pressable 
+              style={styles.startBtnBig} 
+              onPress={() => {
+                router.replace({ pathname: '/training/log', params: { plan_id: planId, mins: String(totalMin) } });
+              }}
+            >
+              <Text style={styles.startBtnBigText}>📝 去打卡记录</Text>
+            </Pressable>
+          </View>
+        </Screen>
+      </View>
+    );
+  }
+
+  const currentItem = items[currentIndex];
+  const nextItem = currentIndex + 1 < items.length ? items[currentIndex + 1] : null;
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Screen scroll={false} transparent={true}>
+        <WorkoutBackground />
+        <View style={styles.runContainer}>
+        <View style={styles.topBar}>
+          <Text style={styles.progressText}>
+            已完成 {currentIndex} 个，共 {items.length} 个
+          </Text>
+          <Pressable onPress={() => setShowBgmMenu(!showBgmMenu)} style={styles.bgmBtn}>
+            <Text style={styles.bgmBtnText}>🎵 {BGM_LIST[bgmIndex].name}</Text>
+          </Pressable>
+        </View>
+
+        {showBgmMenu && (
+          <View style={styles.bgmMenu}>
+            {BGM_LIST.map((bgm, i) => (
+              <Pressable 
+                key={bgm.id} 
+                style={[styles.bgmMenuItem, i === bgmIndex && styles.bgmMenuItemActive]}
+                onPress={() => {
+                  setBgmIndex(i);
+                  setShowBgmMenu(false);
+                }}
+              >
+                <Text style={[styles.bgmMenuText, i === bgmIndex && { color: colors.primary }]}>
+                  {bgm.name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.mainBox}>
+          <Text style={styles.categoryTag}>
+            {currentItem.category === 'tech' ? '🏸 技术' : currentItem.category === 'footwork' ? '👟 步法' : '💪 体能/其他'}
+          </Text>
+          <Text style={styles.currentItemName}>{currentItem.name}</Text>
+          {currentItem.notes ? (
+            <Text style={styles.currentNotes}>💡 {currentItem.notes}</Text>
+          ) : null}
+
+          <Text style={[styles.timer, status === 'paused' && { color: colors.textDim }]}>
+            {fmtTime(timeLeft)}
+          </Text>
+          {status === 'running' && (currentItem.name.includes('六点') || currentItem.name.includes('四方')) && (
+            <Text style={styles.coachHint}>🎧 虚拟教练正在随机报点...</Text>
+          )}
+        </View>
+
+        <View style={styles.bottomArea}>
+          <View style={styles.nextBox}>
+            {nextItem ? (
+              <Text style={styles.nextText}>下一个：{nextItem.name} ({nextItem.duration_min}分钟)</Text>
+            ) : (
+              <Text style={styles.nextText}>这是最后一项</Text>
+            )}
+          </View>
+
+          <View style={styles.controls}>
+            <Pressable style={styles.iconBtn} onPress={exitWorkout}>
+              <View style={[styles.roundSmallBtn, { backgroundColor: colors.danger }]}>
+                <Text style={styles.roundSmallBtnText}>■</Text>
+              </View>
+              <Text style={styles.iconBtnLabel}>结束</Text>
+            </Pressable>
+            
+            <Pressable style={styles.playPauseBtn} onPress={togglePause}>
+              <Text style={styles.playPauseIcon}>{status === 'running' ? '⏸' : '▶'}</Text>
+            </Pressable>
+            
+            <Pressable style={styles.iconBtn} onPress={nextItemManually}>
+              <View style={[styles.roundSmallBtn, { backgroundColor: colors.cardAlt }]}>
+                <Text style={styles.roundSmallBtnText}>⏭</Text>
+              </View>
+              <Text style={styles.iconBtnLabel}>跳过</Text>
+            </Pressable>
+          </View>
+        </View>
+        </View>
+      </Screen>
+    </View>
+  );
+}
+
+function fmtTime(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function WorkoutBackground() {
+  // 使用一张暗调、动感十足的健身/羽毛球场地的图片作为背景，加上一层黑色半透明遮罩，保证前景白色文字清晰可见
+  return (
+    <View style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}>
+      <ImageBackground 
+        source={{ uri: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?q=80&w=2000&auto=format&fit=crop' }} 
+        style={{ flex: 1, width: '100%', height: '100%' }}
+        resizeMode="cover"
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(11, 18, 32, 0.85)' }} />
+      </ImageBackground>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
+  title: { color: colors.text, fontSize: font.h1, fontWeight: '700' },
+  meta: { color: colors.textDim, fontSize: font.body, marginTop: spacing.md },
+  startBtnBig: { backgroundColor: colors.primary, paddingHorizontal: spacing.xxl, paddingVertical: spacing.lg, borderRadius: radius.pill, marginTop: spacing.xxl },
+  startBtnBigText: { color: '#fff', fontSize: font.h3, fontWeight: '800' },
+  runContainer: { flex: 1, justifyContent: 'space-between', zIndex: 1 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.md, paddingHorizontal: spacing.md, minHeight: 44, zIndex: 10 },
+  progressText: { color: colors.textDim, fontSize: font.body, fontWeight: '600', letterSpacing: 1 },
+  bgmBtn: { backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
+  bgmBtnText: { color: colors.text, fontSize: font.small, fontWeight: '600' },
+  bgmMenu: { position: 'absolute', top: 60, right: spacing.md, backgroundColor: colors.cardAlt, borderRadius: radius.md, zIndex: 10, padding: 4, elevation: 5, shadowColor: '#000', shadowOffset: { width:0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8 },
+  bgmMenuItem: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  bgmMenuItemActive: { backgroundColor: colors.card },
+  bgmMenuText: { color: colors.text, fontSize: font.body, textAlign: 'center' },
+  navBackBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
+  navBackIcon: { color: colors.text, fontSize: 18, marginRight: 4, marginTop: -2 },
+  navBackText: { color: colors.text, fontSize: font.small, fontWeight: '600' },
+  mainBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.lg, zIndex: 1 },
+  categoryTag: { color: colors.primary, fontSize: font.body, fontWeight: '700', marginBottom: spacing.md },
+  currentItemName: { color: colors.text, fontSize: 32, fontWeight: '800', textAlign: 'center', lineHeight: 44 },
+  currentNotes: { color: colors.warn, fontSize: font.body, marginTop: spacing.lg, textAlign: 'center' },
+  timer: { color: colors.text, fontSize: 80, fontWeight: '800', fontVariant: ['tabular-nums'], marginTop: spacing.xxl, letterSpacing: 2 },
+  coachHint: { color: colors.accent, marginTop: spacing.lg, fontSize: font.small, fontWeight: '600' },
+  bottomArea: { paddingBottom: spacing.xl },
+  nextBox: { backgroundColor: colors.cardAlt, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.xl },
+  nextText: { color: colors.textDim, fontSize: font.small, textAlign: 'center' },
+  controls: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl },
+  iconBtn: { alignItems: 'center', width: 60 },
+  roundSmallBtn: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
+  roundSmallBtnText: { color: '#fff', fontSize: 20 },
+  iconBtnLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 8 },
+  playPauseBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
+  playPauseIcon: { color: '#fff', fontSize: 36, marginLeft: 4 },
+});
+
