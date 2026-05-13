@@ -1,31 +1,31 @@
 import { Platform } from 'react-native';
 import { Keypoint } from './keypoints';
 
-// 只有在非 Web 下才去真正地 import，为了绕过 Web 的打包器不认识原生 C++ 模块的限制
-// 但必须解构 default，以防 CommonJS 互操作问题
+// 只有在非 Web 下才去执行真正的推断逻辑
 let useTensorflowModel: any = () => ({ state: 'loading' });
 let useFrameProcessor: any = () => null;
 let runOnJS: any = (fn: any) => fn;
+let useResizePlugin: any = () => null;
 
 if (Platform.OS !== 'web') {
   const tflite = require('react-native-fast-tflite');
   const vc = require('react-native-vision-camera');
   const worklets = require('react-native-worklets-core');
+  const resizePlugin = require('vision-camera-resize-plugin');
   
   useTensorflowModel = tflite.useTensorflowModel || tflite.default?.useTensorflowModel;
   useFrameProcessor = vc.useFrameProcessor || vc.default?.useFrameProcessor;
   runOnJS = worklets.runOnJS || worklets.default?.runOnJS;
+  useResizePlugin = resizePlugin.useResizePlugin || resizePlugin.default?.useResizePlugin;
 }
 
 export function useMovenet(onFrame: (kps: Keypoint[]) => void) {
-  // 如果 useTensorflowModel 还是拿不到，说明包坏了，随便返回一个假对象防止崩溃
-  if (typeof useTensorflowModel !== 'function') {
-    return { model: { state: 'loading' }, frameProcessor: null };
-  }
-
+  // 加载本地 Movenet 模型
   const model = useTensorflowModel(
     Platform.OS === 'web' ? null : require('../../../assets/models/movenet_lightning.tflite')
   );
+  
+  const resize = typeof useResizePlugin === 'function' ? useResizePlugin() : null;
 
   let onFrameJS: any = null;
   if (typeof runOnJS === 'function') {
@@ -34,29 +34,40 @@ export function useMovenet(onFrame: (kps: Keypoint[]) => void) {
 
   const frameProcessor = typeof useFrameProcessor === 'function' ? useFrameProcessor((frame: any) => {
     'worklet';
-    if (!model.state || model.state !== 'loaded' || !model.model) return;
-    
-    // 为了防止 TFLite C++ 层的内存对齐错误导致整个 App 闪退，
-    // 在这里暂时屏蔽 runSync() 操作。
-    // 在真机联调调通 Frame resize(192x192) 之前，直接返回一个模拟的居中人影坐标
+    if (!model.state || model.state !== 'loaded' || !model.model || !resize) return;
     
     try {
-      // 用非常简单的高频随机模拟来代替高危的 C++ 运算
-      if (Math.random() < 0.1 && onFrameJS) {
-        const fakeKps: Keypoint[] = [];
-        for (let i = 0; i < 17; i++) {
-          fakeKps.push({ 
-            x: 0.5 + (Math.random() * 0.1 - 0.05), 
-            y: 0.5 + (Math.random() * 0.4 - 0.2), 
-            score: 0.8 
-          });
-        }
-        onFrameJS(fakeKps);
+      // 1. 将高分辨率相机帧缩放为 192x192 的 RGB Float32 数组，供 MoveNet 使用
+      const resized = resize(frame, {
+        scale: {
+          width: 192,
+          height: 192,
+        },
+        pixelFormat: 'rgb',
+        dataType: 'float32',
+      });
+
+      // 2. 执行真正的 AI 骨骼点推断
+      const outputs = model.model.runSync([resized]);
+      const keypointsRaw = outputs[0]; 
+      
+      if (!keypointsRaw || keypointsRaw.length < 51) return;
+
+      const kps: Keypoint[] = [];
+      for (let i = 0; i < 17; i++) {
+        // MoveNet 的坐标是归一化过的 (0~1)，且顺序是 Y, X, Score
+        const y = Number(keypointsRaw[i * 3]);
+        const x = Number(keypointsRaw[i * 3 + 1]);
+        const score = Number(keypointsRaw[i * 3 + 2]);
+        kps.push({ x, y, score });
       }
+
+      if (onFrameJS) onFrameJS(kps);
+
     } catch (e) {
-      // Ignore
+      // 捕获可能的数据结构错误
     }
-  }, [model]) : null;
+  }, [model, resize]) : null;
 
   return { model, frameProcessor };
 }

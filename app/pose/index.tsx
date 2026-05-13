@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-// 在 React Native (含 Expo 原生包) 里，直接 import 是安全的。
-// 因为我们在 Web 里并不会强行渲染 <Camera>，就不会触发它底层的崩溃。
-import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
-
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/Button';
 import { colors, font, radius, spacing } from '@/theme/tokens';
@@ -13,6 +9,19 @@ import { useMovenet } from '@/features/pose/tflite';
 import { Keypoint } from '@/features/pose/keypoints';
 import { SkeletonOverlay } from '@/features/pose/SkeletonOverlay';
 import { insertPoseSession } from '@/db/repos';
+
+// 安全导入 Camera，避免 Web 崩溃
+let Camera: any = () => null;
+let useCameraDevice: any = () => null;
+let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => false });
+
+if (Platform.OS !== 'web') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const vc = require('react-native-vision-camera');
+  Camera = vc.Camera;
+  useCameraDevice = vc.useCameraDevice;
+  useCameraPermission = vc.useCameraPermission;
+}
 
 const ACTIONS: { id: ActionType; label: string; emoji: string }[] = [
   { id: 'clear', label: '高远球', emoji: '🏸' },
@@ -25,7 +34,7 @@ export default function PoseScreen() {
   if (Platform.OS === 'web') {
     return (
       <Screen scroll={false}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
           <Text style={{ fontSize: 40, marginBottom: spacing.md }}>📷</Text>
           <Text style={{ color: colors.text, fontSize: font.h3, fontWeight: '700' }}>Web 暂不支持动作识别</Text>
           <Text style={{ color: colors.textDim, marginTop: spacing.sm, textAlign: 'center', lineHeight: 20 }}>
@@ -44,7 +53,6 @@ function PoseCameraView() {
   const [running, setRunning] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   
-  // 用于存从 Worklet 传回来的真实坐标点
   const [frameData, setFrameData] = useState<Keypoint[] | null>(null);
   const [issues, setIssues] = useState<FeedbackIssue[]>([]);
   const [score, setScore] = useState<number | null>(null);
@@ -52,23 +60,17 @@ function PoseCameraView() {
   const { width } = Dimensions.get('window');
   const camHeight = Math.round((width * 4) / 3);
 
-  // 原生相机 Hook
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('front');
   
-  // 原生 TFLite 模型 Hook，并传入回调接收坐标点
   const { model, frameProcessor } = useMovenet((kps) => {
-    // 这个回调是在 React JS 线程里执行的，安全！
-    if (running) {
-      setFrameData(kps);
-    }
+    if (running) setFrameData(kps);
   });
 
   useEffect(() => {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
 
-  // 每当收到新的一帧坐标，就喂给分析器算分
   useEffect(() => {
     if (!frameData || !running) return;
     const result = analyzeFrame(action, frameData);
@@ -143,7 +145,6 @@ function PoseCameraView() {
 
         <SkeletonOverlay frame={frameData} width={width} height={camHeight} mirrored />
 
-        {/* 模型状态提示 */}
         <View style={styles.mockBadge}>
           <Text style={styles.mockText}>
             🧠 AI {model.state === 'loaded' ? '已就绪' : '加载中...'}
@@ -196,48 +197,14 @@ function scoreColor(s: number) {
 }
 
 const styles = StyleSheet.create({
-  actionRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-    marginBottom: spacing.md,
-  },
-  actionTab: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  cameraWrap: {
-    width: '100%',
-    backgroundColor: '#000',
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    marginBottom: spacing.md,
-  },
+  actionRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.md },
+  actionTab: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
+  cameraWrap: { width: '100%', backgroundColor: '#000', borderRadius: radius.lg, overflow: 'hidden', marginBottom: spacing.md },
   permissionWrap: { alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   permissionText: { color: colors.text, textAlign: 'center' },
-  mockBadge: {
-    position: 'absolute',
-    top: spacing.sm,
-    left: spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.sm,
-  },
+  mockBadge: { position: 'absolute', top: spacing.sm, left: spacing.sm, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.sm },
   mockText: { color: colors.warn, fontSize: font.tiny },
-  scoreBox: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: spacing.sm,
-    borderRadius: radius.md,
-    alignItems: 'center',
-  },
+  scoreBox: { position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: 'rgba(0,0,0,0.7)', padding: spacing.sm, borderRadius: radius.md, alignItems: 'center' },
   scoreLabel: { color: colors.textDim, fontSize: font.tiny },
   scoreVal: { fontSize: 28, fontWeight: '800' },
   feedback: { minHeight: 100, marginBottom: spacing.md },
