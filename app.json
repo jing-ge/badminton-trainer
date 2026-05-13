@@ -42,6 +42,15 @@
           "color": "#10B981"
         }
       ],
+      "expo-font",
+      "react-native-fast-tflite"
+    ],
+      [
+        "expo-notifications",
+        {
+          "color": "#10B981"
+        }
+      ],
       "expo-font"
     ],
     "experiments": {

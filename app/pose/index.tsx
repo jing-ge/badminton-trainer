@@ -17,7 +17,37 @@ const ACTIONS: { id: ActionType; label: string; emoji: string }[] = [
   { id: 'footwork', label: '步法', emoji: '👟' },
 ];
 
+// 安全导入 Camera，避免 Web 崩溃
+let Camera: any = () => null;
+let useCameraDevice: any = () => null;
+let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => false });
+
+if (Platform.OS !== 'web') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const vc = require('react-native-vision-camera');
+  Camera = vc.Camera;
+  useCameraDevice = vc.useCameraDevice;
+  useCameraPermission = vc.useCameraPermission;
+}
+
 export default function PoseScreen() {
+  if (Platform.OS === 'web') {
+    return (
+      <Screen scroll={false}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: 40, marginBottom: spacing.md }}>📷</Text>
+          <Text style={{ color: colors.text, fontSize: font.h3, fontWeight: '700' }}>Web 暂不支持动作识别</Text>
+          <Text style={{ color: colors.textDim, marginTop: spacing.sm, textAlign: 'center', lineHeight: 20 }}>
+            VisionCamera 需要原生手机设备支持，请打出 APK 安装后在真机上体验原生摄像头实时分析！
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
+  return <PoseCameraView />;
+}
+
+function PoseCameraView() {
   const router = useRouter();
   const [action, setAction] = useState<ActionType>('clear');
   const [running, setRunning] = useState(false);
@@ -25,29 +55,13 @@ export default function PoseScreen() {
   const [issues, setIssues] = useState<FeedbackIssue[]>([]);
   const [score, setScore] = useState<number | null>(null);
 
-  const { hasPermission, requestPermission } = useCameraPermission();
-  const device = useCameraDevice('front');
-  const pose = usePoseSource(running);
-
   const { width } = Dimensions.get('window');
   const camHeight = Math.round((width * 4) / 3);
 
-  useEffect(() => {
-    if (!hasPermission) requestPermission();
-  }, [hasPermission, requestPermission]);
-
-  useEffect(() => {
-    if (!pose.frame || !running) return;
-    const result = analyzeFrame(action, pose.frame);
-    setIssues(result.issues);
-    setScore(result.score);
-  }, [pose.frame, running, action]);
-
-  async function stop() {
-    if (!startedAt) {
-      setRunning(false);
-      return;
-    }
+  // 这里的 hooks 只有在非 Web 下才会安全执行
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const device = useCameraDevice('front');
+  const pose = usePoseSource(running);
     const dur = Math.round((Date.now() - startedAt) / 1000);
     setRunning(false);
     if (dur > 3) {
