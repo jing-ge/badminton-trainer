@@ -1,0 +1,15 @@
+diff --git a/node_modules/react-native-worklets-core/android/CMakeLists.txt b/node_modules/react-native-worklets-core/android/CMakeLists.txt
+index c9e4bf8..32622bf 100644
+--- a/node_modules/react-native-worklets-core/android/CMakeLists.txt
++++ b/node_modules/react-native-worklets-core/android/CMakeLists.txt
+@@ -67,9 +67,7 @@ if(ReactAndroid_VERSION_MINOR GREATER_EQUAL 76)
+ else()
+   target_link_libraries(
+     ${PACKAGE_NAME}
+-    ReactAndroid::reactnativejni           # <-- RN: React Native JNI bindings
+-    ReactAndroid::folly_runtime
+-    ReactAndroid::glog
++    ReactAndroid::reactnative             # 强制在0.76里用这个，或者直接删掉旧依赖
+   )
+ endif()
+ 
