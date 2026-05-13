@@ -5,40 +5,40 @@ import type { Plan, TrainingItem, TrainingModule } from './planTypes';
  */
 export const presetItems: TrainingItem[] = [
   // 后场技术
-  { id: 'p-tech-clear', name: '多球：正手高远球 5×30 球', duration_min: 25, category: 'tech', source: 'preset', notes: '注意转体引拍、击球点高、收拍快' },
-  { id: 'p-tech-drop', name: '多球：劈吊对角 4×20 球', duration_min: 20, category: 'tech', source: 'preset', notes: '手腕外旋切球，落点压前场两角' },
-  { id: 'p-tech-smash', name: '多球：杀球直线/斜线 4×15 球', duration_min: 20, category: 'tech', source: 'preset', notes: '腰腹发力，落点近边线' },
-  { id: 'p-tech-bh-clear', name: '反手高远球 4×20 球', duration_min: 18, category: 'tech', source: 'preset', notes: '反手发力顺序：脚→髋→肩→肘→腕' },
+  { id: 'p-tech-clear', name: '多球：正手高远球 5×30 球', duration_min: 25, category: 'tech', source: 'preset', notes: '注意转体引拍、击球点高、收拍快', animationType: 'shuttle-clear' },
+  { id: 'p-tech-drop', name: '多球：劈吊对角 4×20 球', duration_min: 20, category: 'tech', source: 'preset', notes: '手腕外旋切球，落点压前场两角', animationType: 'shuttle-drop' },
+  { id: 'p-tech-smash', name: '多球：杀球直线/斜线 4×15 球', duration_min: 20, category: 'tech', source: 'preset', notes: '腰腹发力，落点近边线', animationType: 'shuttle-smash' },
+  { id: 'p-tech-bh-clear', name: '反手高远球 4×20 球', duration_min: 18, category: 'tech', source: 'preset', notes: '反手发力顺序：脚→髋→肩→肘→腕', animationType: 'shuttle-clear' },
   // 前场技术
-  { id: 'p-net-rub', name: '多球：正反手搓球 各 4×25 球', duration_min: 20, category: 'tech', source: 'preset', notes: '拇指食指捻动，球过网即下坠' },
-  { id: 'p-net-push', name: '多球：推后场 4×20 球', duration_min: 18, category: 'tech', source: 'preset', notes: '小动作发力，落点贴边线' },
-  { id: 'p-net-lift', name: '多球：挑球 4×20 球', duration_min: 15, category: 'tech', source: 'preset', notes: '挑高挑远，避免半场球' },
-  { id: 'p-net-hook', name: '勾对角练习 3×15 球', duration_min: 12, category: 'tech', source: 'preset' },
+  { id: 'p-net-rub', name: '多球：正反手搓球 各 4×25 球', duration_min: 20, category: 'tech', source: 'preset', notes: '拇指食指捻动，球过网即下坠', animationType: 'shuttle-net' },
+  { id: 'p-net-push', name: '多球：推后场 4×20 球', duration_min: 18, category: 'tech', source: 'preset', notes: '小动作发力，落点贴边线', animationType: 'shuttle-push' },
+  { id: 'p-net-lift', name: '多球：挑球 4×20 球', duration_min: 15, category: 'tech', source: 'preset', notes: '挑高挑远，避免半场球', animationType: 'shuttle-lift' },
+  { id: 'p-net-hook', name: '勾对角练习 3×15 球', duration_min: 12, category: 'tech', source: 'preset', animationType: 'shuttle-cross-net' },
   // 发球
-  { id: 'p-serve-short', name: '反手发短球 5×20 球', duration_min: 15, category: 'tech', source: 'preset', notes: '球过网时刚好下坠，落点压 T 区' },
-  { id: 'p-serve-long', name: '正手发后场高远球 4×20 球', duration_min: 15, category: 'tech', source: 'preset' },
+  { id: 'p-serve-short', name: '反手发短球 5×20 球', duration_min: 15, category: 'tech', source: 'preset', notes: '球过网时刚好下坠，落点压 T 区', animationType: 'shuttle-serve' },
+  { id: 'p-serve-long', name: '正手发后场高远球 4×20 球', duration_min: 15, category: 'tech', source: 'preset', animationType: 'shuttle-clear' },
   // 步法
-  { id: 'p-fp-six', name: '六点步法 5×30 秒', duration_min: 15, category: 'footwork', source: 'preset', notes: '保持重心低，回中位要快' },
-  { id: 'p-fp-launch', name: '前后场启动步 4×10 次', duration_min: 15, category: 'footwork', source: 'preset' },
-  { id: 'p-fp-rice', name: '米字步 5×1 分钟', duration_min: 15, category: 'footwork', source: 'preset' },
-  { id: 'p-fp-cross', name: '交叉步退后场 4×20 次', duration_min: 12, category: 'footwork', source: 'preset' },
-  { id: 'p-fp-four', name: '四方球步法 5×1 分钟', duration_min: 20, category: 'footwork', source: 'preset' },
+  { id: 'p-fp-six', name: '六点步法 5×30 秒', duration_min: 15, category: 'footwork', source: 'preset', notes: '保持重心低，回中位要快', animationType: 'footwork-six' },
+  { id: 'p-fp-launch', name: '前后场启动步 4×10 次', duration_min: 15, category: 'footwork', source: 'preset', animationType: 'footwork-launch' },
+  { id: 'p-fp-rice', name: '米字步 5×1 分钟', duration_min: 15, category: 'footwork', source: 'preset', animationType: 'footwork-six' },
+  { id: 'p-fp-cross', name: '交叉步退后场 4×20 次', duration_min: 12, category: 'footwork', source: 'preset', animationType: 'footwork-four' },
+  { id: 'p-fp-four', name: '四方球步法 5×1 分钟', duration_min: 20, category: 'footwork', source: 'preset', animationType: 'footwork-four' },
   // 体能
-  { id: 'p-fit-burpee', name: '波比跳 4×15 个', duration_min: 12, category: 'fitness', source: 'preset' },
-  { id: 'p-fit-jumpsquat', name: '深蹲跳 4×20 个', duration_min: 12, category: 'fitness', source: 'preset' },
-  { id: 'p-fit-core', name: '核心：平板/俄罗斯转体 各 3 组', duration_min: 12, category: 'fitness', source: 'preset' },
-  { id: 'p-fit-rope', name: '跳绳 5×60 秒', duration_min: 10, category: 'fitness', source: 'preset' },
-  { id: 'p-fit-lunge', name: '弓步跳 4×20 个', duration_min: 12, category: 'fitness', source: 'preset' },
-  { id: 'p-fit-shuttle', name: '折返跑 6×30 秒', duration_min: 15, category: 'fitness', source: 'preset' },
+  { id: 'p-fit-burpee', name: '波比跳 4×15 个', duration_min: 12, category: 'fitness', source: 'preset', animationType: 'fitness-explosive' },
+  { id: 'p-fit-jumpsquat', name: '深蹲跳 4×20 个', duration_min: 12, category: 'fitness', source: 'preset', animationType: 'fitness-explosive' },
+  { id: 'p-fit-core', name: '核心：平板/俄罗斯转体 各 3 组', duration_min: 12, category: 'fitness', source: 'preset', animationType: 'fitness-core' },
+  { id: 'p-fit-rope', name: '跳绳 5×60 秒', duration_min: 10, category: 'fitness', source: 'preset', animationType: 'fitness-endurance' },
+  { id: 'p-fit-lunge', name: '弓步跳 4×20 个', duration_min: 12, category: 'fitness', source: 'preset', animationType: 'fitness-explosive' },
+  { id: 'p-fit-shuttle', name: '折返跑 6×30 秒', duration_min: 15, category: 'fitness', source: 'preset', animationType: 'fitness-endurance' },
   // 实战
-  { id: 'p-match-21', name: '21 分制比赛 3-5 局', duration_min: 90, category: 'match', source: 'preset', notes: '用本周练习的技术，打完做录像复盘' },
-  { id: 'p-match-half', name: '半场对练（仅后场/仅网前）', duration_min: 30, category: 'match', source: 'preset' },
+  { id: 'p-match-21', name: '21 分制比赛 3-5 局', duration_min: 90, category: 'match', source: 'preset', notes: '用本周练习的技术，打完做录像复盘', animationType: 'tactics-single' },
+  { id: 'p-match-half', name: '半场对练（仅后场/仅网前）', duration_min: 30, category: 'match', source: 'preset', animationType: 'tactics-single' },
   { id: 'p-match-double', name: '双打配合练习', duration_min: 45, category: 'match', source: 'preset' },
   // 恢复 / 热身
-  { id: 'p-rec-warm', name: '动态热身（关节活动 + 慢跑）', duration_min: 10, category: 'recovery', source: 'preset' },
-  { id: 'p-rec-cool', name: '拉伸放松', duration_min: 10, category: 'recovery', source: 'preset' },
-  { id: 'p-rec-jog', name: '慢跑 30 分钟', duration_min: 30, category: 'recovery', source: 'preset' },
-  { id: 'p-rec-stretch', name: '全身静态拉伸', duration_min: 20, category: 'recovery', source: 'preset' },
+  { id: 'p-rec-warm', name: '动态热身（关节活动 + 慢跑）', duration_min: 10, category: 'recovery', source: 'preset', animationType: 'fitness-coordination' },
+  { id: 'p-rec-cool', name: '拉伸放松', duration_min: 10, category: 'recovery', source: 'preset', animationType: 'fitness-coordination' },
+  { id: 'p-rec-jog', name: '慢跑 30 分钟', duration_min: 30, category: 'recovery', source: 'preset', animationType: 'fitness-endurance' },
+  { id: 'p-rec-stretch', name: '全身静态拉伸', duration_min: 20, category: 'recovery', source: 'preset', animationType: 'fitness-coordination' },
 ];
 
 export function getPresetItem(id: string) {

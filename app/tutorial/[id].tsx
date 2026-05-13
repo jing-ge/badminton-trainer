@@ -1,9 +1,15 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { colors, font, spacing } from '@/theme/tokens';
 import { findTutorial } from '@/data/tutorials';
+import { FootworkAnimation } from '@/components/animations/FootworkAnimation';
+import { ShuttlecockAnimation } from '@/components/animations/ShuttlecockAnimation';
+import { FitnessAnimation } from '@/components/animations/FitnessAnimation';
+import { TacticsAnimation } from '@/components/animations/TacticsAnimation';
+import { GripGuide } from '@/components/animations/GripGuide';
 
 export default function TutorialDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,6 +30,48 @@ export default function TutorialDetail() {
       <Text style={styles.sub}>
         {t.category} · {t.level}
       </Text>
+
+      {t.animationType?.startsWith('footwork') && (
+        <View style={styles.videoContainer}>
+          <FootworkAnimation type={t.animationType} />
+        </View>
+      )}
+      {t.animationType?.startsWith('shuttle') && (
+        <View style={styles.videoContainer}>
+          <ShuttlecockAnimation type={t.animationType} />
+        </View>
+      )}
+      {t.animationType?.startsWith('fitness') && (
+        <View style={styles.videoContainer}>
+          <FitnessAnimation type={t.animationType} name={t.title} />
+        </View>
+      )}
+      {t.animationType?.startsWith('tactics') && (
+        <View style={styles.videoContainer}>
+          <TacticsAnimation />
+        </View>
+      )}
+      {t.videoUri ? (
+        <View style={styles.videoContainer}>
+          <Video
+            source={{ uri: t.videoUri }}
+            style={styles.video}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay
+            isLooping
+            isMuted
+            useNativeControls
+          />
+        </View>
+      ) : null}
+
+      {/* 新增：持拍法图解 */}
+      {t.gripType && (
+        <View style={{ marginTop: spacing.lg }}>
+          <Text style={styles.section}>🏸 关键持拍法</Text>
+          <GripGuide type={t.gripType} />
+        </View>
+      )}
 
       <Card style={{ marginTop: spacing.lg }}>
         <Text style={styles.section}>✅ 动作要点</Text>
@@ -83,4 +131,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaText: { color: '#fff', fontWeight: '700', fontSize: font.body },
+  videoContainer: {
+    marginTop: spacing.md,
+    width: '100%',
+    height: 320,
+    backgroundColor: '#0B1220',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+  },
 });

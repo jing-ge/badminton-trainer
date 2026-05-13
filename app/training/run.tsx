@@ -2,13 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View, ImageBackground } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
-import { Audio } from 'expo-av';
+import { Audio, Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
+import { vibrateLight, vibrateMedium, vibrateSuccess, vibrateHeavy } from '@/utils/haptics';
 import { colors, font, radius, spacing } from '@/theme/tokens';
 import { getActivePlan } from '@/db/plans';
 import { selectToday } from '@/data/selectToday';
 import type { TrainingItem, TrainingModule } from '@/data/planTypes';
+import { FootworkAnimation } from '@/components/animations/FootworkAnimation';
+import { ShuttlecockAnimation } from '@/components/animations/ShuttlecockAnimation';
+import { FitnessAnimation } from '@/components/animations/FitnessAnimation';
+import { TacticsAnimation } from '@/components/animations/TacticsAnimation';
 
 import { defaultPlans } from '@/data/presets';
 
@@ -39,7 +44,10 @@ export default function TrainingRunScreen() {
   }
 
   const [timeLeft, setTimeLeft] = useState(0);
-  const [status, setStatus] = useState<'idle' | 'running' | 'paused' | 'finished'>('idle');
+  const [status, setStatus] = useState<'idle' | 'preparing' | 'running' | 'paused' | 'finished'>('idle');
+  const [prepTime, setPrepTime] = useState(5); // 准备期倒计时
+
+  const [conditionScale, setConditionScale] = useState<number>(1.0); // 身体状态缩放系数
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
@@ -111,7 +119,22 @@ export default function TrainingRunScreen() {
   }, [mid]);
 
   useEffect(() => {
-    if (status === 'running' && timeLeft > 0) {
+    if (status === 'preparing') {
+      bgmSoundRef.current?.pauseAsync(); // 准备期间暂停BGM
+      timerRef.current = setInterval(() => {
+        setPrepTime((prev) => {
+          if (prev <= 1) {
+            stopTimer();
+            setStatus('running');
+            vibrateMedium();
+            return 0;
+          }
+          speak(String(prev - 1), 1.5);
+          vibrateLight();
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (status === 'running' && timeLeft > 0) {
       bgmSoundRef.current?.playAsync();
 
       timerRef.current = setInterval(() => {
@@ -252,33 +275,47 @@ export default function TrainingRunScreen() {
 
   function startWorkout() {
     if (items.length === 0) return;
-    setStatus('running');
-    startItem(0);
+    vibrateMedium();
+    startItem(0, true);
   }
 
-  function startItem(idx: number) {
+  function startItem(idx: number, isFirst: boolean = false) {
     const it = items[idx];
     setCurrentIndex(idx);
-    setTimeLeft(it.duration_min * 60);
     
-    let text = `准备开始：${it.name}，时长 ${it.duration_min} 分钟。`;
+    // 应用身体状态缩放系数，最小不低于 1 分钟
+    const scaledMin = Math.max(1, Math.round(it.duration_min * conditionScale));
+    setTimeLeft(scaledMin * 60);
+    
+    let text = `下一个动作：${it.name}，时长 ${scaledMin} 分钟。`;
     if (it.notes) text += `注意：${it.notes}`;
+    
     speak(text);
+    
+    // 给足语音播报的时间，稍微长一点再切入倒数
+    setTimeout(() => {
+      setPrepTime(5);
+      setStatus('preparing');
+      setTimeout(() => { speak('5'); vibrateLight(); }, 1000);
+    }, isFirst ? 2000 : 3500); 
   }
 
   function handleItemFinish() {
     stopTimer();
     const nextIdx = currentIndexRef.current + 1;
+    vibrateHeavy();
     if (nextIdx < items.length) {
-      speak('时间到。');
-      setTimeout(() => startItem(nextIdx), 1500);
+      speak('时间到。准备休息并进入下一项。');
+      setTimeout(() => startItem(nextIdx), 2500);
     } else {
       setStatus('finished');
+      vibrateSuccess();
       speak('恭喜你，已完成本次所有训练内容，太棒了！');
     }
   }
 
   function nextItemManually() {
+    vibrateLight();
     if (Platform.OS === 'web') {
       const ok = window.confirm('你确定要提前结束当前动作进入下一项吗？');
       if (ok) {
@@ -298,6 +335,7 @@ export default function TrainingRunScreen() {
   }
 
   function togglePause() {
+    vibrateMedium();
     if (status === 'running') {
       setStatus('paused');
       bgmSoundRef.current?.pauseAsync();
@@ -332,16 +370,39 @@ export default function TrainingRunScreen() {
       <View style={{ flex: 1 }}>
         <Screen scroll={false} transparent={true}>
           <WorkoutBackground />
-        <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
-            <Ionicons name="chevron-back" size={20} color={colors.text} style={{ marginRight: 2 }} />
-            <Text style={styles.navBackText}>返回</Text>
-          </Pressable>
-        </View>
+          <View style={styles.topBar}>
+            <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
+              <Ionicons name="chevron-back" size={20} color={colors.text} style={{ marginRight: 2 }} />
+              <Text style={styles.navBackText}>返回</Text>
+            </Pressable>
+          </View>
           <View style={styles.centerWrap}>
             <Text style={{ fontSize: 60, marginBottom: spacing.md }}>🏸</Text>
             <Text style={styles.title}>本次训练共 {items.length} 项</Text>
-            <Text style={styles.meta}>预计需要 {totalMin} 分钟</Text>
+            <Text style={styles.meta}>原定需要 {totalMin} 分钟</Text>
+
+            {/* 增加今天状态的调查问卷 */}
+            <View style={{ marginTop: spacing.xl, width: '100%', paddingHorizontal: spacing.xl }}>
+              <Text style={{ color: colors.text, textAlign: 'center', marginBottom: spacing.md, fontWeight: '600' }}>今天感觉怎么样？</Text>
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <Pressable onPress={() => { setConditionScale(1.0); vibrateLight(); }} style={[styles.conditionBtn, conditionScale === 1.0 && styles.conditionBtnActive]}>
+                  <Text style={{ fontSize: 28 }}>🔋</Text>
+                  <Text style={[styles.conditionText, conditionScale === 1.0 && { color: colors.primary }]}>满血</Text>
+                  <Text style={styles.conditionDesc}>100% 负荷</Text>
+                </Pressable>
+                <Pressable onPress={() => { setConditionScale(0.75); vibrateLight(); }} style={[styles.conditionBtn, conditionScale === 0.75 && styles.conditionBtnActive]}>
+                  <Text style={{ fontSize: 28 }}>🔋</Text>
+                  <Text style={[styles.conditionText, conditionScale === 0.75 && { color: colors.primary }]}>一般</Text>
+                  <Text style={styles.conditionDesc}>75% 负荷</Text>
+                </Pressable>
+                <Pressable onPress={() => { setConditionScale(0.5); vibrateLight(); }} style={[styles.conditionBtn, conditionScale === 0.5 && styles.conditionBtnActive]}>
+                  <Text style={{ fontSize: 28 }}>🪫</Text>
+                  <Text style={[styles.conditionText, conditionScale === 0.5 && { color: colors.primary }]}>疲惫</Text>
+                  <Text style={styles.conditionDesc}>50% 负荷</Text>
+                </Pressable>
+              </View>
+            </View>
+
             <Pressable style={styles.startBtnBig} onPress={startWorkout}>
               <Text style={styles.startBtnBigText}>▶ 开始跟练</Text>
             </Pressable>
@@ -351,28 +412,48 @@ export default function TrainingRunScreen() {
     );
   }
 
-  if (status === 'finished') {
+  if (status === 'preparing') {
+    const currentItem = items[currentIndex];
     return (
       <View style={{ flex: 1 }}>
         <Screen scroll={false} transparent={true}>
           <WorkoutBackground />
-        <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
-            <Ionicons name="chevron-back" size={20} color={colors.text} style={{ marginRight: 2 }} />
-            <Text style={styles.navBackText}>返回</Text>
-          </Pressable>
-        </View>
+          <View style={[styles.centerWrap, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+            <Text style={{ color: colors.primary, fontSize: font.h2, fontWeight: '700', marginBottom: spacing.lg }}>准备动作</Text>
+            <Text style={{ color: colors.text, fontSize: 32, fontWeight: '800', textAlign: 'center', marginHorizontal: spacing.lg }}>{currentItem.name}</Text>
+            {currentItem.notes ? <Text style={{ color: colors.warn, fontSize: font.h3, marginTop: spacing.md, textAlign: 'center' }}>💡 {currentItem.notes}</Text> : null}
+            <Text style={{ color: colors.text, fontSize: 120, fontWeight: '800', marginTop: spacing.xxl, fontVariant: ['tabular-nums'] }}>{prepTime}</Text>
+          </View>
+        </Screen>
+      </View>
+    );
+  }
+
+  if (status === 'finished') {
+    const actualMin = items.reduce((acc, it) => acc + Math.max(1, Math.round(it.duration_min * conditionScale)), 0);
+    return (
+      <View style={{ flex: 1 }}>
+        <Screen scroll={false} transparent={true}>
+          <WorkoutBackground />
+          <View style={styles.topBar}>
+            <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
+              <Ionicons name="chevron-back" size={20} color={colors.text} style={{ marginRight: 2 }} />
+              <Text style={styles.navBackText}>返回</Text>
+            </Pressable>
+          </View>
           <View style={styles.centerWrap}>
-            <Text style={{ fontSize: 60, marginBottom: spacing.md }}>🎉</Text>
-            <Text style={styles.title}>训练完成！</Text>
-            <Text style={styles.meta}>你坚持练完了 {totalMin} 分钟的内容</Text>
+            <View style={styles.badgeWrap}>
+              <Text style={{ fontSize: 80 }}>🏆</Text>
+            </View>
+            <Text style={[styles.title, { color: colors.warn, fontSize: 36, marginTop: spacing.lg }]}>训练完成！</Text>
+            <Text style={styles.meta}>你今天坚持练完了 {actualMin} 分钟的内容</Text>
             <Pressable 
-              style={styles.startBtnBig} 
+              style={[styles.startBtnBig, { backgroundColor: colors.warn }]} 
               onPress={() => {
-                router.replace({ pathname: '/training/log', params: { plan_id: planId, mins: String(totalMin) } });
+                router.replace({ pathname: '/training/log', params: { plan_id: planId, mins: String(actualMin) } });
               }}
             >
-              <Text style={styles.startBtnBigText}>📝 去打卡记录</Text>
+              <Text style={[styles.startBtnBigText, { color: '#000' }]}>📝 领取奖励并打卡</Text>
             </Pressable>
           </View>
         </Screen>
@@ -421,9 +502,39 @@ export default function TrainingRunScreen() {
         )}
 
         <View style={styles.mainBox}>
-          <Text style={styles.categoryTag}>
-            {currentItem.category === 'tech' ? '🏸 技术' : currentItem.category === 'footwork' ? '👟 步法' : '💪 体能/其他'}
-          </Text>
+          {currentItem.animationType?.startsWith('footwork') ? (
+            <View style={styles.demoVideoWrap}>
+              <FootworkAnimation type={currentItem.animationType} />
+            </View>
+          ) : currentItem.animationType?.startsWith('shuttle') ? (
+            <View style={styles.demoVideoWrap}>
+              <ShuttlecockAnimation type={currentItem.animationType} />
+            </View>
+          ) : currentItem.animationType?.startsWith('fitness') ? (
+            <View style={styles.demoVideoWrap}>
+              <FitnessAnimation type={currentItem.animationType} name={currentItem.name} />
+            </View>
+          ) : currentItem.animationType?.startsWith('tactics') ? (
+            <View style={styles.demoVideoWrap}>
+              <TacticsAnimation />
+            </View>
+          ) : currentItem.videoUri ? (
+            <View style={styles.demoVideoWrap}>
+              <Video
+                source={{ uri: currentItem.videoUri }}
+                style={StyleSheet.absoluteFillObject}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay={status === 'running'}
+                isLooping
+                isMuted // 必须静音，否则会干扰教练说话和BGM
+              />
+            </View>
+          ) : (
+            <Text style={styles.categoryTag}>
+              {currentItem.category === 'tech' ? '🏸 技术' : currentItem.category === 'footwork' ? '👟 步法' : '💪 体能/其他'}
+            </Text>
+          )}
+
           <Text style={styles.currentItemName}>{currentItem.name}</Text>
           {currentItem.notes ? (
             <Text style={styles.currentNotes}>💡 {currentItem.notes}</Text>
@@ -502,6 +613,7 @@ const styles = StyleSheet.create({
   runContainer: { flex: 1, justifyContent: 'space-between', zIndex: 1 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.md, paddingHorizontal: spacing.md, minHeight: 44, zIndex: 10 },
   progressText: { color: colors.textDim, fontSize: font.body, fontWeight: '600', letterSpacing: 1 },
+  demoVideoWrap: { width: '100%', height: 260, borderRadius: radius.lg, backgroundColor: colors.card, overflow: 'hidden', marginBottom: spacing.md, borderWidth: 3, borderColor: colors.primary },
   bgmBtn: { backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
   bgmBtnText: { color: colors.text, fontSize: font.small, fontWeight: '600' },
   bgmMenu: { position: 'absolute', top: 60, right: spacing.md, backgroundColor: colors.cardAlt, borderRadius: radius.md, zIndex: 10, padding: 4, elevation: 5, shadowColor: '#000', shadowOffset: { width:0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8 },
@@ -524,5 +636,10 @@ const styles = StyleSheet.create({
   roundSmallBtn: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
   iconBtnLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 8 },
   playPauseBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
+  conditionBtn: { flex: 1, alignItems: 'center', backgroundColor: colors.card, padding: spacing.md, borderRadius: radius.md, borderWidth: 2, borderColor: 'transparent' },
+  conditionBtnActive: { borderColor: colors.primary, backgroundColor: colors.cardAlt },
+  conditionText: { color: colors.textDim, fontWeight: '700', fontSize: font.h3, marginTop: spacing.sm },
+  conditionDesc: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
+  badgeWrap: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(245, 158, 11, 0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.warn, shadowColor: colors.warn, shadowOpacity: 0.8, shadowRadius: 20, shadowOffset: { width: 0, height: 0 } },
 });
 

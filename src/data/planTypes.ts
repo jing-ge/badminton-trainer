@@ -13,14 +13,22 @@
 
 export type TrainingCategory = 'tech' | 'footwork' | 'fitness' | 'match' | 'recovery';
 
+export type AnimationType = 
+  | 'shuttle-clear' | 'shuttle-smash' | 'shuttle-drop' | 'shuttle-net' | 'shuttle-cross-net' | 'shuttle-lift' | 'shuttle-push' | 'shuttle-serve'
+  | 'footwork-six' | 'footwork-four' | 'footwork-launch'
+  | 'fitness-explosive' | 'fitness-core' | 'fitness-endurance' | 'fitness-coordination'
+  | 'tactics-single';
+
 export type TrainingItem = {
   id: string;
   name: string;
   duration_min: number;
   category: TrainingCategory;
   notes?: string;
-  source?: 'preset' | 'custom'; // 来源
-  preset_id?: string; // 如果来自预置库，记录原 id
+  source?: 'preset' | 'custom';
+  preset_id?: string;
+  videoUri?: string;
+  animationType?: AnimationType; // 支持纯代码渲染的教学动画
 };
 
 export type TrainingModule = {

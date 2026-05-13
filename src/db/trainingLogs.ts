@@ -9,6 +9,8 @@ export type TrainingLog = {
   categories: string[];
   intensity: number;
   note: string | null;
+  opponent?: string; // 比赛对手
+  match_result?: 'win' | 'loss' | 'draw'; // 比赛结果
   created_at: number;
 };
 
@@ -19,9 +21,21 @@ export async function insertTrainingLog(input: {
   categories: string[];
   intensity?: number;
   note?: string;
+  opponent?: string;
+  match_result?: 'win' | 'loss' | 'draw';
 }) {
   const db = await getDB();
   const date = input.date ?? dayjs().format('YYYY-MM-DD');
+  
+  // 我们把 opponent 和 match_result 塞进 note 或者作为新列。
+  // 因为之前的表结构没有加这两列，最兼容的方式是把它们序列化合并进 categories 或 note
+  // 或者利用 SQLite 的 alter table (如果只是新用户)。为了兼容老的 memoryDB，我把它们存进 JSON 的 categories 里作为一个特殊标记
+  const extraPayload = {
+    opponent: input.opponent,
+    match_result: input.match_result,
+  };
+  const categoriesToSave = [...input.categories, `__meta:${JSON.stringify(extraPayload)}`];
+
   await db.runAsync(
     `INSERT INTO training_logs (date, plan_id, duration_min, categories, intensity, note, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -29,7 +43,7 @@ export async function insertTrainingLog(input: {
       date,
       input.plan_id ?? null,
       input.duration_min,
-      JSON.stringify(input.categories),
+      JSON.stringify(categoriesToSave),
       input.intensity ?? 3,
       input.note ?? null,
       Date.now(),
@@ -43,10 +57,18 @@ export async function listTrainingLogs(limit = 60): Promise<TrainingLog[]> {
     `SELECT * FROM training_logs ORDER BY date DESC, id DESC LIMIT ?`,
     [limit],
   );
-  return rows.map((r) => ({
-    ...r,
-    categories: safeParse(r.categories, []),
-  }));
+  return rows.map((r) => {
+    const rawCats = safeParse<string[]>(r.categories, []);
+    const realCats = rawCats.filter(c => !c.startsWith('__meta:'));
+    const metaStr = rawCats.find(c => c.startsWith('__meta:'))?.replace('__meta:', '');
+    const meta = metaStr ? safeParse<any>(metaStr, {}) : {};
+    return {
+      ...r,
+      categories: realCats,
+      opponent: meta.opponent,
+      match_result: meta.match_result,
+    };
+  });
 }
 
 export async function deleteTrainingLog(id: number) {

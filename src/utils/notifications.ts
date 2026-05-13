@@ -46,10 +46,10 @@ export async function scheduleWeeklyReminder(opts: {
       sound: true,
     },
     trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
       weekday: opts.weekday + 1,
       hour: opts.hour,
       minute: opts.minute,
-      repeats: true,
     },
   });
   return id;

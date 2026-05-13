@@ -16,6 +16,7 @@ export default function HomeScreen() {
   const [today, setToday] = useState<TodaySelection | null>(null);
   const [streak, setStreak] = useState(0);
   const [recent, setRecent] = useState<TrainingLog[]>([]);
+  const [daysSinceLast, setDaysSinceLast] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -23,7 +24,15 @@ export default function HomeScreen() {
         const plan = await getActivePlan();
         setToday(selectToday(plan));
         setStreak(await getStreak());
-        setRecent(await listTrainingLogs(3));
+        const logs = await listTrainingLogs(3);
+        setRecent(logs);
+        
+        if (logs.length > 0) {
+          const lastDate = dayjs(logs[0].date);
+          setDaysSinceLast(dayjs().diff(lastDate, 'day'));
+        } else {
+          setDaysSinceLast(999);
+        }
       })();
     }, []),
   );
@@ -65,6 +74,23 @@ export default function HomeScreen() {
           </Text>
         }
       >
+        {daysSinceLast >= 3 && (
+          <Card style={{ marginBottom: spacing.md, backgroundColor: colors.accent + '20', borderColor: colors.accent }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 32, marginRight: spacing.sm }}>🧘</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.accent, fontWeight: '700', fontSize: font.h3 }}>你已经 {daysSinceLast === 999 ? '很久' : `${daysSinceLast} 天`} 没练啦！</Text>
+                <Text style={{ color: colors.textDim, fontSize: font.small, marginTop: 2 }}>今天不打球？做个 10 分钟的静力拉伸或者核心力量，把火苗续上吧！</Text>
+              </View>
+            </View>
+            <Button
+              title="去做个恢复训练"
+              onPress={() => router.push('/training/fitness')}
+              style={{ marginTop: spacing.md, backgroundColor: colors.accent }}
+            />
+          </Card>
+        )}
+
         {today ? (
           today.modules.length === 0 ? (
             <Card>

@@ -1,3 +1,5 @@
+import type { AnimationType } from './planTypes';
+
 export type Tutorial = {
   id: string;
   title: string;
@@ -6,6 +8,9 @@ export type Tutorial = {
   keyPoints: string[];
   commonMistakes: string[];
   checkpoints: string[];
+  videoUri?: string; // 新增视频链接支持
+  animationType?: AnimationType;
+  gripType?: 'forehand' | 'backhand'; // 握拍法
 };
 
 export const tutorials: Tutorial[] = [
@@ -14,6 +19,8 @@ export const tutorials: Tutorial[] = [
     title: '正手高远球',
     category: '后场',
     level: '中级',
+    animationType: 'shuttle-clear',
+    gripType: 'forehand',
     keyPoints: [
       '准备：侧身对网，左肩对球，右脚在后',
       '引拍：右肘抬起略高于肩，前臂外旋后拉',
@@ -37,6 +44,8 @@ export const tutorials: Tutorial[] = [
     title: '正手杀球',
     category: '后场',
     level: '中级',
+    animationType: 'shuttle-smash',
+    gripType: 'forehand',
     keyPoints: [
       '起跳：左脚蹬地，身体腾空腾起',
       '引拍：拍面向下后方拉，肘部高于肩',
@@ -61,6 +70,7 @@ export const tutorials: Tutorial[] = [
     title: '劈吊（劈杀斜线吊球）',
     category: '后场',
     level: '中级',
+    animationType: 'shuttle-drop',
     keyPoints: [
       '动作与高远/杀球前段完全一致（隐蔽性）',
       '击球瞬间手腕外旋切削球托侧面',
@@ -83,6 +93,8 @@ export const tutorials: Tutorial[] = [
     title: '正手搓球',
     category: '前场',
     level: '中级',
+    animationType: 'shuttle-net',
+    gripType: 'forehand',
     keyPoints: [
       '上网最后一步用右脚跨出，膝盖弯曲',
       '手臂前伸，拍面接近水平',
@@ -105,6 +117,7 @@ export const tutorials: Tutorial[] = [
     title: '挑球',
     category: '前场',
     level: '入门',
+    animationType: 'shuttle-lift',
     keyPoints: [
       '上网后下蹲降低重心',
       '小臂外旋发力，手腕鞭打向上',
@@ -121,6 +134,7 @@ export const tutorials: Tutorial[] = [
     title: '六点步法',
     category: '步法',
     level: '中级',
+    animationType: 'footwork-six',
     keyPoints: [
       '中位 → 前场两角 → 中位 → 中场两侧 → 中位 → 后场两角',
       '前场用右脚跨步（右手持拍）',
@@ -142,6 +156,8 @@ export const tutorials: Tutorial[] = [
     title: '反手发短球',
     category: '发球',
     level: '中级',
+    animationType: 'shuttle-serve',
+    gripType: 'backhand',
     keyPoints: [
       '握拍：拇指顶在宽面，反手握',
       '球托放在拍面正前方，接近网高',
@@ -160,6 +176,7 @@ export const tutorials: Tutorial[] = [
     title: '单打基本战术：拉吊突击',
     category: '战术',
     level: '中级',
+    animationType: 'tactics-single',
     keyPoints: [
       '用高远 + 吊球四点调动对手',
       '发现对手回球弱（半场、高球）立即突击杀球',

@@ -1,8 +1,11 @@
 import { Platform } from 'react-native';
-import * as SQLite from 'expo-sqlite';
 import { createMemoryDB, MemoryDB } from './memoryDB';
 
-export type DBHandle = SQLite.SQLiteDatabase | MemoryDB;
+export interface DBHandle {
+  execAsync(sql: string): Promise<void>;
+  runAsync(sql: string, params?: any[]): Promise<{ lastInsertRowId: number; changes: number }>;
+  getAllAsync<T = any>(sql: string, params?: any[]): Promise<T[]>;
+}
 
 let _db: DBHandle | null = null;
 
@@ -13,9 +16,14 @@ export async function getDB(): Promise<DBHandle> {
     await migrate(_db);
     return _db;
   }
-  _db = await SQLite.openDatabaseAsync('badminton.db');
-  await migrate(_db);
-  return _db;
+  
+  // 原生平台才引入真实 SQLite
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const SQLite = require('expo-sqlite');
+  const actualDb = await SQLite.openDatabaseAsync('badminton.db');
+  _db = actualDb;
+  await migrate(actualDb);
+  return actualDb;
 }
 
 async function migrate(db: DBHandle) {
