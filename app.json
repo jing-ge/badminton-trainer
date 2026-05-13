@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.you.badmintontrainer",
       "infoPlist": {
-        "NSCameraUsageDescription": "需要使用摄像头进行动作识别与录像复盘",
+        "NSCameraUsageDescription": "需要使用摄像头识别羽毛球动作",
         "NSMicrophoneUsageDescription": "录像复盘时需要录音",
         "NSPhotoLibraryUsageDescription": "用于导入对战录像"
       }
@@ -65,10 +65,13 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {
+        "origin": false
+      },
       "eas": {
-        "projectId": "f0a957bc-5399-4129-8227-5f953961d9b8"
+        "projectId": "07019ed4-b74e-48c3-9f02-09cc5112589a"
       }
     },
-    "owner": "jingge777"
+    "owner": "fengbojing"
   }
 }
