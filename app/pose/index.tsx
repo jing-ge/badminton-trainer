@@ -18,9 +18,9 @@ let useCameraPermission: any = () => ({ hasPermission: false, requestPermission:
 if (Platform.OS !== 'web') {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const vc = require('react-native-vision-camera');
-  Camera = vc.Camera;
-  useCameraDevice = vc.useCameraDevice;
-  useCameraPermission = vc.useCameraPermission;
+  Camera = vc.Camera || vc.default?.Camera;
+  useCameraDevice = vc.useCameraDevice || vc.default?.useCameraDevice;
+  useCameraPermission = vc.useCameraPermission || vc.default?.useCameraPermission;
 }
 
 const ACTIONS: { id: ActionType; label: string; emoji: string }[] = [
