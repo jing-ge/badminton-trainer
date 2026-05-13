@@ -18,9 +18,9 @@ import { TacticsAnimation } from '@/components/animations/TacticsAnimation';
 import { defaultPlans } from '@/data/presets';
 
 const BGM_LIST = [
-  { id: 'electronic', name: '动感电子', file: require('@/../assets/sounds/bgm_electronic.mp3') },
-  { id: 'relax', name: '轻松纯音', file: require('@/../assets/sounds/bgm_relax.mp3') },
-  { id: 'epic', name: '史诗激昂', file: require('@/../assets/sounds/bgm_epic.mp3') },
+  { id: 'electronic', name: '动感电子', file: require('../../assets/sounds/bgm_electronic.mp3') },
+  { id: 'relax', name: '轻松纯音', file: require('../../assets/sounds/bgm_relax.mp3') },
+  { id: 'epic', name: '史诗激昂', file: require('../../assets/sounds/bgm_epic.mp3') },
   { id: 'none', name: '无音乐', file: null }
 ];
 

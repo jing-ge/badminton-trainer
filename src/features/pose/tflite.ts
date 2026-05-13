@@ -17,7 +17,7 @@ if (Platform.OS !== 'web') {
 
 export function useMovenet(onFrame: (kps: Keypoint[]) => void) {
   const model = useTensorflowModel(
-    Platform.OS === 'web' ? null : require('@/../assets/models/movenet_lightning.tflite')
+    Platform.OS === 'web' ? null : require('../../../assets/models/movenet_lightning.tflite')
   );
 
   const onFrameJS = runOnJS(onFrame);
