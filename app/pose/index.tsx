@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Camera, useCameraDevice, useCameraPermission } from '@/features/pose/cameraShim';
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/Button';
 import { colors, font, radius, spacing } from '@/theme/tokens';
@@ -62,6 +61,23 @@ function PoseCameraView() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('front');
   const pose = usePoseSource(running);
+
+  useEffect(() => {
+    if (!hasPermission) requestPermission();
+  }, [hasPermission, requestPermission]);
+
+  useEffect(() => {
+    if (!pose.frame || !running) return;
+    const result = analyzeFrame(action, pose.frame);
+    setIssues(result.issues);
+    setScore(result.score);
+  }, [pose.frame, running, action]);
+
+  async function stop() {
+    if (!startedAt) {
+      setRunning(false);
+      return;
+    }
     const dur = Math.round((Date.now() - startedAt) / 1000);
     setRunning(false);
     if (dur > 3) {
