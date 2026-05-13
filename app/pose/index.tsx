@@ -16,11 +16,15 @@ let useCameraDevice: any = () => null;
 let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => false });
 
 if (Platform.OS !== 'web') {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const vc = require('react-native-vision-camera');
-  Camera = vc.Camera || vc.default?.Camera;
-  useCameraDevice = vc.useCameraDevice || vc.default?.useCameraDevice;
-  useCameraPermission = vc.useCameraPermission || vc.default?.useCameraPermission;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const vc = require('react-native-vision-camera');
+    Camera = vc.Camera || vc.default?.Camera || (() => null);
+    useCameraDevice = vc.useCameraDevice || vc.default?.useCameraDevice || (() => null);
+    useCameraPermission = vc.useCameraPermission || vc.default?.useCameraPermission || (() => ({ hasPermission: false, requestPermission: async () => false }));
+  } catch (e) {
+    console.log('Vision camera require failed');
+  }
 }
 
 const ACTIONS: { id: ActionType; label: string; emoji: string }[] = [
@@ -156,15 +160,31 @@ function PoseCameraView() {
         {/* 模型状态提示 */}
         <View style={styles.mockBadge}>
           <Text style={styles.mockText}>
-            🧠 AI {model.state === 'loaded' ? '已就绪' : '加载中...'}
+            🧠 AI {
+              model.state === 'loaded' ? '已就绪' : 
+              model.state === 'mock' ? '降级 Mock 模式' :
+              model.state === 'error' ? '加载失败' : '加载中...'
+            }
           </Text>
         </View>
 
+        {/* 测试信息：把接收到的原始帧数据直接打印在屏幕上 */}
+        {frameData && frameData.length > 0 && (
+          <View style={{ position: 'absolute', bottom: 120, left: spacing.md, backgroundColor: 'rgba(0,0,0,0.5)', padding: 4, borderRadius: 4 }}>
+            <Text style={{ color: '#fff', fontSize: 10 }}>
+              AI 原始置信度探测: 
+              {frameData[0]?.score?.toFixed(2)}, {frameData[5]?.score?.toFixed(2)}
+            </Text>
+          </View>
+        )}
+
         {/* 致命底层报错提示（如果有） */}
-        {modelError && (
+        {(modelError || model.error) && (
           <View style={{ position: 'absolute', top: 60, left: spacing.md, right: spacing.md, backgroundColor: 'rgba(239, 68, 68, 0.9)', padding: spacing.md, borderRadius: radius.md }}>
             <Text style={{ color: '#fff', fontSize: font.small, fontWeight: '700' }}>[模型推断异常]</Text>
-            <Text style={{ color: '#fff', fontSize: font.tiny, marginTop: 4 }}>{modelError}</Text>
+            <Text style={{ color: '#fff', fontSize: font.tiny, marginTop: 4 }}>
+              {modelError || (model.error?.message ?? String(model.error))}
+            </Text>
           </View>
         )}
 

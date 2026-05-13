@@ -61,14 +61,16 @@ export default function TrainingRunScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const { sound: hitSound } = await Audio.Sound.createAsync(
-          require('../../assets/sounds/hit.ogg')
-        );
-        const { sound: squeakSound } = await Audio.Sound.createAsync(
-          require('../../assets/sounds/squeak.ogg')
-        );
-        sfxHitRef.current = hitSound;
-        sfxSqueakRef.current = squeakSound;
+        const hitMod = require('../../assets/sounds/hit.ogg');
+        const squeakMod = require('../../assets/sounds/squeak.ogg');
+        if (hitMod) {
+          const { sound: hitSound } = await Audio.Sound.createAsync(hitMod);
+          sfxHitRef.current = hitSound;
+        }
+        if (squeakMod) {
+          const { sound: squeakSound } = await Audio.Sound.createAsync(squeakMod);
+          sfxSqueakRef.current = squeakSound;
+        }
       } catch(e) {
         console.log('SFX load failed:', e);
       }

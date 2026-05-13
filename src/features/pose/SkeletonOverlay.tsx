@@ -26,7 +26,8 @@ export function SkeletonOverlay({
         const pa = frame[a];
         const pb = frame[b];
         if (!pa || !pb) return null;
-        if ((pa.score ?? 1) < 0.3 || (pb.score ?? 1) < 0.3) return null;
+        // 把画线的置信度阈值从 0.3 降低到 0.05，看看哪怕是极度模糊的鬼影模型能不能画出来
+        if ((pa.score ?? 1) < 0.05 || (pb.score ?? 1) < 0.05) return null;
         const A = project(pa);
         const B = project(pb);
         return (
@@ -43,7 +44,7 @@ export function SkeletonOverlay({
         );
       })}
       {frame.map((p, i) => {
-        if ((p.score ?? 1) < 0.3) return null;
+        if ((p.score ?? 1) < 0.05) return null;
         const P = project(p);
         return (
           <Circle key={i} cx={P.x} cy={P.y} r={4} fill={colors.warn} />

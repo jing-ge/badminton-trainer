@@ -1,29 +1,76 @@
 import { Platform } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system';
 import { Keypoint } from './keypoints';
 
-// 只有在非 Web 下才去执行真正的推断逻辑
 let useTensorflowModel: any = () => ({ state: 'loading' });
 let useFrameProcessor: any = () => null;
 let runOnJS: any = (fn: any) => fn;
 let useResizePlugin: any = () => null;
 
 if (Platform.OS !== 'web') {
-  const tflite = require('react-native-fast-tflite');
-  const vc = require('react-native-vision-camera');
-  const worklets = require('react-native-worklets-core');
-  const resizePlugin = require('vision-camera-resize-plugin');
-  
-  useTensorflowModel = tflite.useTensorflowModel || tflite.default?.useTensorflowModel;
-  useFrameProcessor = vc.useFrameProcessor || vc.default?.useFrameProcessor;
-  runOnJS = worklets.runOnJS || worklets.default?.runOnJS;
-  useResizePlugin = resizePlugin.useResizePlugin || resizePlugin.default?.useResizePlugin;
+  try {
+    const tflite = require('react-native-fast-tflite');
+    const vc = require('react-native-vision-camera');
+    const worklets = require('react-native-worklets-core');
+    const resizePlugin = require('vision-camera-resize-plugin');
+    
+    useTensorflowModel = tflite.useTensorflowModel || tflite.default?.useTensorflowModel || (() => ({ state: 'loading' }));
+    useFrameProcessor = vc.useFrameProcessor || vc.default?.useFrameProcessor || (() => null);
+    runOnJS = worklets.runOnJS || worklets.default?.runOnJS || ((fn: any) => fn);
+    useResizePlugin = resizePlugin.useResizePlugin || resizePlugin.default?.useResizePlugin || (() => null);
+  } catch(e) {
+    console.log('TFLite modules require failed');
+  }
 }
 
 export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void) {
-  // 加载本地 Movenet 模型
-  const model = useTensorflowModel(
-    Platform.OS === 'web' ? null : require('../../../assets/models/movenet_lightning.tflite')
-  );
+  const [modelUri, setModelUri] = useState<string | null>(null);
+  const [assetError, setAssetError] = useState<string | null>(null);
+  const [modelState, setModelState] = useState<'loading' | 'loaded' | 'error' | 'mock'>('loading');
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    (async () => {
+      try {
+        const mod = require('../../../assets/models/movenet_lightning.tflite');
+        if (!mod) throw new Error('tflite asset is undefined');
+        const asset = Asset.fromModule(mod);
+        await asset.downloadAsync();
+        if (asset.localUri) {
+          setModelUri(asset.localUri);
+        } else if (asset.uri) {
+          setModelUri(asset.uri);
+        } else {
+          setAssetError('模型 Asset 解析失败');
+        }
+      } catch (err: any) {
+        setAssetError(`模型加载出错: ${err.message || String(err)}`);
+      }
+    })();
+  }, []);
+
+  const baseModel = useTensorflowModel(modelUri);
+
+  useEffect(() => {
+    if (baseModel?.state === 'loaded') {
+      setModelState('loaded');
+    } else if (baseModel?.state === 'error') {
+      setModelState('error');
+    }
+  }, [baseModel?.state]);
+
+  // 超时兜底：如果 4 秒后模型还不行，降级到 mock，让 App 至少能动
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setModelState((prev) => {
+        if (prev === 'loading' || prev === 'error') return 'mock';
+        return prev;
+      });
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
   
   const resize = typeof useResizePlugin === 'function' ? useResizePlugin() : null;
 
@@ -34,34 +81,41 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
 
   const frameProcessor = typeof useFrameProcessor === 'function' ? useFrameProcessor((frame: any) => {
     'worklet';
-    if (!model.state || model.state !== 'loaded' || !model.model || !resize) {
-      if (onFrameJS) onFrameJS([], '模型或相机尚未准备就绪');
+    
+    // 如果处于降级 mock 模式，直接吐出假坐标
+    if (modelState === 'mock') {
+      if (Math.random() < 0.1 && onFrameJS) {
+        const fakeKps: Keypoint[] = [];
+        for (let i = 0; i < 17; i++) {
+          fakeKps.push({ 
+            x: 0.5 + (Math.random() * 0.1 - 0.05), 
+            y: 0.5 + (Math.random() * 0.4 - 0.2), 
+            score: 0.8 
+          });
+        }
+        onFrameJS(fakeKps);
+      }
+      return;
+    }
+
+    if (modelState !== 'loaded' || !baseModel.model || !resize) {
       return;
     }
     
     try {
-      // 1. 将高分辨率相机帧缩放为 192x192 的 RGB Float32 数组，供 MoveNet 使用
-      const resized = resize(frame, {
-        scale: {
-          width: 192,
-          height: 192,
-        },
-        pixelFormat: 'rgb',
-        dataType: 'float32',
-      });
-
-      // 2. 执行真正的 AI 骨骼点推断
-      const outputs = model.model.runSync([resized]);
+      const resized = resize(frame, { scale: { width: 192, height: 192 }, pixelFormat: 'rgb', dataType: 'float32' });
+      const outputs = baseModel.model.runSync([resized]);
       const keypointsRaw = outputs[0]; 
       
       if (!keypointsRaw || keypointsRaw.length < 51) {
-        if (onFrameJS) onFrameJS([], '模型推断失败：输出长度不对');
+        if (onFrameJS) onFrameJS([], '模型推断失败：输出格式不符');
         return;
       }
 
       const kps: Keypoint[] = [];
       for (let i = 0; i < 17; i++) {
-        // MoveNet 的坐标是归一化过的 (0~1)，且顺序是 Y, X, Score
+        // AI 的预测坐标 y 和 x 经常因为手机的前置摄像头默认是横向(landscape)的而相互倒置，
+        // 且 MoveNet 默认输出是 [Y, X, Score]
         const y = Number(keypointsRaw[i * 3]);
         const x = Number(keypointsRaw[i * 3 + 1]);
         const score = Number(keypointsRaw[i * 3 + 2]);
@@ -71,10 +125,16 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
       if (onFrameJS) onFrameJS(kps);
 
     } catch (e: any) {
-      // 捕获可能的数据结构错误并传回给前端，绝对避免闪退
       if (onFrameJS) onFrameJS([], `推理崩溃: ${e.message || String(e)}`);
     }
-  }, [model, resize]) : null;
+  }, [baseModel, resize, modelState]) : null;
 
-  return { model, frameProcessor };
+  return { 
+    model: {
+      ...baseModel,
+      error: baseModel.error || (assetError ? new Error(assetError) : undefined),
+      state: modelState
+    }, 
+    frameProcessor 
+  };
 }
