@@ -49,6 +49,26 @@ export default function TrainingLogScreen() {
       { text: '好', onPress: () => router.replace('/stats') },
     ]);
   }
+    await insertTrainingLog({
+      duration_min: min,
+      categories: cats,
+      intensity,
+      note: note.trim() || undefined,
+      opponent: opponent.trim() || undefined,
+      match_result: matchResult,
+      plan_id: plan_id ?? null,
+    });
+    
+    if (Platform.OS === 'web') {
+      window.alert('打卡成功！坚持训练，进步看得见 💪');
+      router.replace('/stats');
+      return;
+    }
+
+    Alert.alert('打卡成功！', '坚持训练，进步看得见 💪', [
+      { text: '好', onPress: () => router.replace('/stats') },
+    ]);
+  }
 
   return (
     <Screen>
@@ -99,6 +119,30 @@ export default function TrainingLogScreen() {
 
       {cats.includes('实战') && (
         <Card style={{ marginTop: spacing.md }}>
+          <Text style={styles.label}>对手是谁？(可选)</Text>
+          <TextInput
+            value={opponent}
+            onChangeText={setOpponent}
+            style={[styles.input, { marginBottom: spacing.md }]}
+            placeholder="老王、陈总..."
+            placeholderTextColor={colors.textDim}
+          />
+          <Text style={styles.label}>战绩</Text>
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+            <Pressable onPress={() => setMatchResult('win')} style={[styles.tag, matchResult === 'win' && { backgroundColor: colors.danger, borderColor: colors.danger }]}>
+              <Text style={{ color: matchResult === 'win' ? '#fff' : colors.textDim }}>🏆 赢了</Text>
+            </Pressable>
+            <Pressable onPress={() => setMatchResult('loss')} style={[styles.tag, matchResult === 'loss' && { backgroundColor: colors.border, borderColor: colors.border }]}>
+              <Text style={{ color: matchResult === 'loss' ? '#fff' : colors.textDim }}>💔 输了</Text>
+            </Pressable>
+            <Pressable onPress={() => setMatchResult('draw')} style={[styles.tag, matchResult === 'draw' && { backgroundColor: colors.accent, borderColor: colors.accent }]}>
+              <Text style={{ color: matchResult === 'draw' ? '#fff' : colors.textDim }}>🤝 平局</Text>
+            </Pressable>
+          </View>
+        </Card>
+      )}
+
+      <Card style={{ marginTop: spacing.md }}>
           <Text style={styles.label}>对手是谁？(可选)</Text>
           <TextInput
             value={opponent}

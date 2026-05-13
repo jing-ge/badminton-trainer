@@ -3,6 +3,7 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View, ImageBackground } f
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { Audio, Video, ResizeMode } from 'expo-av';
+import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { vibrateLight, vibrateMedium, vibrateSuccess, vibrateHeavy } from '@/utils/haptics';
@@ -53,6 +54,30 @@ export default function TrainingRunScreen() {
   
   // 背景音乐引用
   const bgmSoundRef = useRef<Audio.Sound | null>(null);
+  const sfxHitRef = useRef<Audio.Sound | null>(null);
+  const sfxSqueakRef = useRef<Audio.Sound | null>(null);
+
+  // 预加载音效
+  useEffect(() => {
+    (async () => {
+      try {
+        const { sound: hitSound } = await Audio.Sound.createAsync(
+          require('../../assets/sounds/hit.ogg')
+        );
+        const { sound: squeakSound } = await Audio.Sound.createAsync(
+          require('../../assets/sounds/squeak.ogg')
+        );
+        sfxHitRef.current = hitSound;
+        sfxSqueakRef.current = squeakSound;
+      } catch(e) {
+        console.log('SFX load failed:', e);
+      }
+    })();
+    return () => {
+      sfxHitRef.current?.unloadAsync();
+      sfxSqueakRef.current?.unloadAsync();
+    };
+  }, []);
 
   // 加载特定 BGM
   async function loadBgm(index: number, currentStatus: string) {
@@ -180,6 +205,9 @@ export default function TrainingRunScreen() {
 
     const adjElapsed = elapsed - 5;
 
+    const playHit = () => { sfxHitRef.current?.replayAsync().catch(()=>{}); };
+    const playSqueak = () => { sfxSqueakRef.current?.replayAsync().catch(()=>{}); };
+
     // 1. 匹配「次数/个数」：例如 "波比跳 4x15个"
     const matchReps = item.name.match(/(\d+)\s*[x×*]\s*(\d+)\s*(个|次)/);
     if (matchReps) {
@@ -199,7 +227,11 @@ export default function TrainingRunScreen() {
           // 工作期：计数
           if (t % repTime === 0) {
             const rep = Math.floor(t / repTime) + 1;
-            if (rep <= reps) speak(rep.toString(), 1.5);
+            if (rep <= reps) {
+              speak(rep.toString(), 1.5);
+              if (item.category === 'tech' || item.category === 'match') playHit();
+              if (item.category === 'footwork') playSqueak();
+            }
             if (rep === reps) setTimeout(() => speak('好，休息三十秒'), 1500);
           }
         } else {
@@ -236,9 +268,11 @@ export default function TrainingRunScreen() {
           if (workLeft > 3 && workLeft % 3 === 0 && item.name.includes('六点')) {
             const pts = ['左前网', '右前网', '左后退', '右后退', '左接杀', '右接杀'];
             speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
+            playSqueak();
           } else if (workLeft > 3 && workLeft % 4 === 0 && item.name.includes('四方')) {
             const pts = ['左前', '右前', '左后', '右后'];
             speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
+            playSqueak();
           }
         } else {
           // 休息期
@@ -254,9 +288,11 @@ export default function TrainingRunScreen() {
     if (item.name.includes('六点') && timeLeftSec % 3 === 0) {
       const pts = ['左前网', '右前网', '左后退', '右后退', '左接杀', '右接杀'];
       speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
+      playSqueak();
     } else if (item.name.includes('四方') && timeLeftSec % 4 === 0) {
       const pts = ['左前', '右前', '左后', '右后'];
       speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
+      playSqueak();
     } else if (item.category === 'fitness' && timeLeftSec % 15 === 0) {
       const pts = ['坚持住', '注意呼吸', '保持节奏', '核心收紧', '发力'];
       speak(pts[Math.floor(Math.random() * pts.length)], 1.2);
@@ -264,6 +300,7 @@ export default function TrainingRunScreen() {
       if (timeLeftSec % 3 === 0) {
         const beat = Math.floor(elapsed / 3) % 4 + 1;
         speak(beat.toString(), 1.5);
+        playHit();
       } else if (timeLeftSec % 20 === 0) {
         const pts = ['注意动作完整', '体会发力', '回中要快', '盯住球'];
         speak(pts[Math.floor(Math.random() * pts.length)], 1.2);
@@ -546,6 +583,23 @@ export default function TrainingRunScreen() {
           {status === 'running' && (currentItem.name.includes('六点') || currentItem.name.includes('四方')) && (
             <Text style={styles.coachHint}>🎧 虚拟教练正在随机报点...</Text>
           )}
+
+          {/* 新增: 时间微调滑动条 */}
+          <View style={{ width: '80%', marginTop: spacing.lg }}>
+            <Slider
+              style={{ width: '100%', height: 40 }}
+              minimumValue={0}
+              maximumValue={Math.max(1, Math.round(currentItem.duration_min * conditionScale)) * 60}
+              value={timeLeft}
+              onValueChange={(val) => setTimeLeft(Math.floor(val))}
+              minimumTrackTintColor={colors.primary}
+              maximumTrackTintColor={colors.border}
+              thumbTintColor="#fff"
+            />
+            <Text style={{ color: colors.textDim, fontSize: font.tiny, textAlign: 'center' }}>
+              拖动可直接调整剩余时间
+            </Text>
+          </View>
         </View>
 
         <View style={styles.bottomArea}>
