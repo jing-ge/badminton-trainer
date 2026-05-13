@@ -3,12 +3,17 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
+import * as SystemUI from 'expo-system-ui';
 import { getDB } from '@/db';
 import { colors } from '@/theme/tokens';
 
 export default function RootLayout() {
   useEffect(() => {
     getDB().catch((e) => console.warn('DB init failed', e));
+    
+    // 强制将系统背景（包括下拉回弹和底部安全区）设为深蓝色，防止出现白边
+    SystemUI.setBackgroundColorAsync(colors.bg).catch(()=>{});
   }, []);
 
   return (

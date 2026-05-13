@@ -17,6 +17,12 @@
     },
     "android": {
       "package": "com.you.badmintontrainer",
+      "backgroundColor": "#0B1220",
+      "navigationBar": {
+        "visible": "sticky",
+        "backgroundColor": "#0B1220",
+        "barStyle": "light-content"
+      },
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
