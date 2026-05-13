@@ -52,32 +52,12 @@ export async function listTrainingLogs(limit = 60): Promise<TrainingLog[]> {
   const db = await getDB();
   const rows = await db.getAllAsync<any>(
     `SELECT * FROM training_logs ORDER BY date DESC, id DESC LIMIT ?`,
-    [limit],
+    [limit]
   );
-  return rows.map((r) => {
+  return rows.map((r: any) => {
     const rawCats = safeParse<string[]>(r.categories, []);
     const realCats = rawCats.filter((c: string) => !c.startsWith('__meta:'));
     const metaStr = rawCats.find((c: string) => c.startsWith('__meta:'))?.replace('__meta:', '');
-    const meta = metaStr ? safeParse<any>(metaStr, {}) : {};
-    return {
-      ...r,
-      categories: realCats,
-      opponent: meta.opponent,
-      match_result: meta.match_result,
-    };
-  });
-}
-
-export async function listTrainingLogs(limit = 60): Promise<TrainingLog[]> {
-  const db = await getDB();
-  const rows = await db.getAllAsync<any>(
-    `SELECT * FROM training_logs ORDER BY date DESC, id DESC LIMIT ?`,
-    [limit],
-  );
-  return rows.map((r) => {
-    const rawCats = safeParse<string[]>(r.categories, []);
-    const realCats = rawCats.filter(c => !c.startsWith('__meta:'));
-    const metaStr = rawCats.find(c => c.startsWith('__meta:'))?.replace('__meta:', '');
     const meta = metaStr ? safeParse<any>(metaStr, {}) : {};
     return {
       ...r,
@@ -99,9 +79,9 @@ export async function getDailyMinutes(days = 14) {
   const rows = await db.getAllAsync<{ date: string; mins: number }>(
     `SELECT date, SUM(duration_min) as mins FROM training_logs
      WHERE date >= ? GROUP BY date ORDER BY date ASC`,
-    [since],
+    [since]
   );
-  const map = new Map(rows.map((r) => [r.date, r.mins]));
+  const map = new Map(rows.map((r: any) => [r.date, r.mins]));
   const result: { date: string; mins: number }[] = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = dayjs().subtract(i, 'day').format('YYYY-MM-DD');
@@ -113,9 +93,9 @@ export async function getDailyMinutes(days = 14) {
 export async function getStreak(): Promise<number> {
   const db = await getDB();
   const rows = await db.getAllAsync<{ date: string }>(
-    `SELECT DISTINCT date FROM training_logs ORDER BY date DESC`,
+    `SELECT DISTINCT date FROM training_logs ORDER BY date DESC`
   );
-  const set = new Set(rows.map((r) => r.date));
+  const set = new Set(rows.map((r: any) => r.date));
   let streak = 0;
   let cursor = dayjs();
   if (!set.has(cursor.format('YYYY-MM-DD'))) {
