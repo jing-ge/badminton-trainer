@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Alert, Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+// 在 React Native (含 Expo 原生包) 里，直接 import 是安全的。
+// 因为我们在 Web 里并不会强行渲染 <Camera>，就不会触发它底层的崩溃。
+import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/Button';
 import { colors, font, radius, spacing } from '@/theme/tokens';
@@ -9,19 +13,6 @@ import { useMovenet } from '@/features/pose/tflite';
 import { Keypoint } from '@/features/pose/keypoints';
 import { SkeletonOverlay } from '@/features/pose/SkeletonOverlay';
 import { insertPoseSession } from '@/db/repos';
-
-// 安全导入 Camera，避免 Web 崩溃
-let Camera: any = () => null;
-let useCameraDevice: any = () => null;
-let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => false });
-
-if (Platform.OS !== 'web') {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const vc = require('react-native-vision-camera');
-  Camera = vc.Camera;
-  useCameraDevice = vc.useCameraDevice;
-  useCameraPermission = vc.useCameraPermission;
-}
 
 const ACTIONS: { id: ActionType; label: string; emoji: string }[] = [
   { id: 'clear', label: '高远球', emoji: '🏸' },
