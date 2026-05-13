@@ -19,7 +19,7 @@ if (Platform.OS !== 'web') {
   useResizePlugin = resizePlugin.useResizePlugin || resizePlugin.default?.useResizePlugin;
 }
 
-export function useMovenet(onFrame: (kps: Keypoint[]) => void) {
+export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void) {
   // 加载本地 Movenet 模型
   const model = useTensorflowModel(
     Platform.OS === 'web' ? null : require('../../../assets/models/movenet_lightning.tflite')
@@ -34,7 +34,10 @@ export function useMovenet(onFrame: (kps: Keypoint[]) => void) {
 
   const frameProcessor = typeof useFrameProcessor === 'function' ? useFrameProcessor((frame: any) => {
     'worklet';
-    if (!model.state || model.state !== 'loaded' || !model.model || !resize) return;
+    if (!model.state || model.state !== 'loaded' || !model.model || !resize) {
+      if (onFrameJS) onFrameJS([], '模型或相机尚未准备就绪');
+      return;
+    }
     
     try {
       // 1. 将高分辨率相机帧缩放为 192x192 的 RGB Float32 数组，供 MoveNet 使用
@@ -51,7 +54,10 @@ export function useMovenet(onFrame: (kps: Keypoint[]) => void) {
       const outputs = model.model.runSync([resized]);
       const keypointsRaw = outputs[0]; 
       
-      if (!keypointsRaw || keypointsRaw.length < 51) return;
+      if (!keypointsRaw || keypointsRaw.length < 51) {
+        if (onFrameJS) onFrameJS([], '模型推断失败：输出长度不对');
+        return;
+      }
 
       const kps: Keypoint[] = [];
       for (let i = 0; i < 17; i++) {
@@ -64,8 +70,9 @@ export function useMovenet(onFrame: (kps: Keypoint[]) => void) {
 
       if (onFrameJS) onFrameJS(kps);
 
-    } catch (e) {
-      // 捕获可能的数据结构错误
+    } catch (e: any) {
+      // 捕获可能的数据结构错误并传回给前端，绝对避免闪退
+      if (onFrameJS) onFrameJS([], `推理崩溃: ${e.message || String(e)}`);
     }
   }, [model, resize]) : null;
 

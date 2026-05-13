@@ -56,6 +56,7 @@ function PoseCameraView() {
   const [frameData, setFrameData] = useState<Keypoint[] | null>(null);
   const [issues, setIssues] = useState<FeedbackIssue[]>([]);
   const [score, setScore] = useState<number | null>(null);
+  const [modelError, setModelError] = useState<string | null>(null);
 
   const { width } = Dimensions.get('window');
   const camHeight = Math.round((width * 4) / 3);
@@ -63,8 +64,15 @@ function PoseCameraView() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('front');
   
-  const { model, frameProcessor } = useMovenet((kps) => {
-    if (running) setFrameData(kps);
+  const { model, frameProcessor } = useMovenet((kps, errorMsg) => {
+    if (errorMsg) {
+      setModelError(errorMsg);
+      return;
+    }
+    if (running) {
+      setModelError(null);
+      setFrameData(kps);
+    }
   });
 
   useEffect(() => {
@@ -145,13 +153,22 @@ function PoseCameraView() {
 
         <SkeletonOverlay frame={frameData} width={width} height={camHeight} mirrored />
 
+        {/* 模型状态提示 */}
         <View style={styles.mockBadge}>
           <Text style={styles.mockText}>
             🧠 AI {model.state === 'loaded' ? '已就绪' : '加载中...'}
           </Text>
         </View>
 
-        {score !== null && running && (
+        {/* 致命底层报错提示（如果有） */}
+        {modelError && (
+          <View style={{ position: 'absolute', top: 60, left: spacing.md, right: spacing.md, backgroundColor: 'rgba(239, 68, 68, 0.9)', padding: spacing.md, borderRadius: radius.md }}>
+            <Text style={{ color: '#fff', fontSize: font.small, fontWeight: '700' }}>[模型推断异常]</Text>
+            <Text style={{ color: '#fff', fontSize: font.tiny, marginTop: 4 }}>{modelError}</Text>
+          </View>
+        )}
+
+        {score !== null && running && !modelError && (
           <View style={styles.scoreBox}>
             <Text style={styles.scoreLabel}>得分</Text>
             <Text style={[styles.scoreVal, { color: scoreColor(score) }]}>{score}</Text>
