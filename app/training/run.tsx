@@ -54,63 +54,17 @@ export default function TrainingRunScreen() {
     setCurrentIndexState(idx);
   }
 
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(0); // 当前项剩余秒数
   const [status, setStatus] = useState<'idle' | 'preparing' | 'running' | 'paused' | 'finished'>('idle');
   const [prepTime, setPrepTime] = useState(5); // 准备期倒计时
 
   const [conditionScale, setConditionScale] = useState<number>(1.0); // 身体状态缩放系数
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  
-  // 背景音乐引用
-  const bgmSoundRef = useRef<Audio.Sound | null>(null);
-  const sfxHitRef = useRef<Audio.Sound | null>(null);
-  const sfxSqueakRef = useRef<Audio.Sound | null>(null);
 
-  // 预加载音效
-  useEffect(() => {
-    (async () => {
-      try {
-        const { sound: hitSound } = await Audio.Sound.createAsync(
-          require('../../assets/sounds/hit.ogg')
-        );
-        const { sound: squeakSound } = await Audio.Sound.createAsync(
-          require('../../assets/sounds/squeak.ogg')
-        );
-        sfxHitRef.current = hitSound;
-        sfxSqueakRef.current = squeakSound;
-      } catch(e) {
-        console.log('SFX load failed:', e);
-      }
-    })();
-    return () => {
-      sfxHitRef.current?.unloadAsync();
-      sfxSqueakRef.current?.unloadAsync();
-    };
-  }, []);
-
-  // 加载特定 BGM
+  // 没有大体积 BGM，保留占位，彻底杜绝 OOM
   async function loadBgm(index: number, currentStatus: string) {
-    if (bgmSoundRef.current) {
-      await bgmSoundRef.current.unloadAsync();
-      bgmSoundRef.current = null;
-    }
-    const bgm = BGM_LIST[index];
-    const file = getBgmFile(bgm.id);
-    if (file) {
-      try {
-        const { sound } = await Audio.Sound.createAsync(
-          file,
-          { shouldPlay: currentStatus === 'running', isLooping: true, volume: 0.15 }
-        );
-        bgmSoundRef.current = sound;
-        if (currentStatus === 'running') {
-          await bgmSoundRef.current.playAsync();
-        }
-      } catch (e) {
-        console.log('BGM load failed:', e);
-      }
-    }
+    return;
   }
 
   // 初次加载和切换时触发
@@ -148,15 +102,11 @@ export default function TrainingRunScreen() {
     return () => {
       stopTimer();
       Speech.stop();
-      if (bgmSoundRef.current) {
-        bgmSoundRef.current.unloadAsync();
-      }
     };
   }, [mid]);
 
   useEffect(() => {
     if (status === 'preparing') {
-      bgmSoundRef.current?.pauseAsync(); // 准备期间暂停BGM
       timerRef.current = setInterval(() => {
         setPrepTime((prev) => {
           if (prev <= 1) {
@@ -171,8 +121,6 @@ export default function TrainingRunScreen() {
         });
       }, 1000);
     } else if (status === 'running' && timeLeft > 0) {
-      bgmSoundRef.current?.playAsync();
-
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
@@ -190,7 +138,6 @@ export default function TrainingRunScreen() {
         });
       }, 1000);
     } else {
-      bgmSoundRef.current?.pauseAsync();
       stopTimer();
     }
     return stopTimer;
@@ -216,9 +163,6 @@ export default function TrainingRunScreen() {
 
     const adjElapsed = elapsed - 5;
 
-    const playHit = () => { sfxHitRef.current?.replayAsync().catch(()=>{}); };
-    const playSqueak = () => { sfxSqueakRef.current?.replayAsync().catch(()=>{}); };
-
     // 1. 匹配「次数/个数」：例如 "波比跳 4x15个"
     const matchReps = item.name.match(/(\d+)\s*[x×*]\s*(\d+)\s*(个|次)/);
     if (matchReps) {
@@ -240,8 +184,6 @@ export default function TrainingRunScreen() {
             const rep = Math.floor(t / repTime) + 1;
             if (rep <= reps) {
               speak(rep.toString(), 1.5);
-              if (item.category === 'tech' || item.category === 'match') playHit();
-              if (item.category === 'footwork') playSqueak();
             }
             if (rep === reps) setTimeout(() => speak('好，休息三十秒'), 1500);
           }
@@ -279,11 +221,9 @@ export default function TrainingRunScreen() {
           if (workLeft > 3 && workLeft % 3 === 0 && item.name.includes('六点')) {
             const pts = ['左前网', '右前网', '左后退', '右后退', '左接杀', '右接杀'];
             speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
-            playSqueak();
           } else if (workLeft > 3 && workLeft % 4 === 0 && item.name.includes('四方')) {
             const pts = ['左前', '右前', '左后', '右后'];
             speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
-            playSqueak();
           }
         } else {
           // 休息期
@@ -299,11 +239,9 @@ export default function TrainingRunScreen() {
     if (item.name.includes('六点') && timeLeftSec % 3 === 0) {
       const pts = ['左前网', '右前网', '左后退', '右后退', '左接杀', '右接杀'];
       speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
-      playSqueak();
     } else if (item.name.includes('四方') && timeLeftSec % 4 === 0) {
       const pts = ['左前', '右前', '左后', '右后'];
       speak(pts[Math.floor(Math.random() * pts.length)], 1.3);
-      playSqueak();
     } else if (item.category === 'fitness' && timeLeftSec % 15 === 0) {
       const pts = ['坚持住', '注意呼吸', '保持节奏', '核心收紧', '发力'];
       speak(pts[Math.floor(Math.random() * pts.length)], 1.2);
@@ -311,7 +249,6 @@ export default function TrainingRunScreen() {
       if (timeLeftSec % 3 === 0) {
         const beat = Math.floor(elapsed / 3) % 4 + 1;
         speak(beat.toString(), 1.5);
-        playHit();
       } else if (timeLeftSec % 20 === 0) {
         const pts = ['注意动作完整', '体会发力', '回中要快', '盯住球'];
         speak(pts[Math.floor(Math.random() * pts.length)], 1.2);
@@ -386,11 +323,9 @@ export default function TrainingRunScreen() {
     vibrateMedium();
     if (status === 'running') {
       setStatus('paused');
-      bgmSoundRef.current?.pauseAsync();
       speak('训练已暂停');
     } else if (status === 'paused') {
       setStatus('running');
-      bgmSoundRef.current?.playAsync();
       speak('继续训练');
     }
   }

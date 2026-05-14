@@ -1,31 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState, useRef } from 'react';
+import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/Button';
 import { colors, font, radius, spacing } from '@/theme/tokens';
 import { ActionType, analyzeFrame, FeedbackIssue } from '@/features/pose/analyzer';
-import { useMovenet } from '@/features/pose/tflite';
-import { Keypoint } from '@/features/pose/keypoints';
+import { mockFrame } from '@/features/pose/mock';
 import { SkeletonOverlay } from '@/features/pose/SkeletonOverlay';
 import { insertPoseSession } from '@/db/repos';
-
-// 安全导入 Camera，避免 Web 崩溃
-let Camera: any = () => null;
-let useCameraDevice: any = () => null;
-let useCameraPermission: any = () => ({ hasPermission: false, requestPermission: async () => false });
-
-if (Platform.OS !== 'web') {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const vc = require('react-native-vision-camera');
-    Camera = vc.Camera || vc.default?.Camera || (() => null);
-    useCameraDevice = vc.useCameraDevice || vc.default?.useCameraDevice || (() => null);
-    useCameraPermission = vc.useCameraPermission || vc.default?.useCameraPermission || (() => ({ hasPermission: false, requestPermission: async () => false }));
-  } catch (e) {
-    console.log('Vision camera require failed');
-  }
-}
+import { Keypoint } from '@/features/pose/keypoints';
 
 const ACTIONS: { id: ActionType; label: string; emoji: string }[] = [
   { id: 'clear', label: '高远球', emoji: '🏸' },
@@ -35,23 +18,6 @@ const ACTIONS: { id: ActionType; label: string; emoji: string }[] = [
 ];
 
 export default function PoseScreen() {
-  if (Platform.OS === 'web') {
-    return (
-      <Screen scroll={false}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
-          <Text style={{ fontSize: 40, marginBottom: spacing.md }}>📷</Text>
-          <Text style={{ color: colors.text, fontSize: font.h3, fontWeight: '700' }}>Web 暂不支持动作识别</Text>
-          <Text style={{ color: colors.textDim, marginTop: spacing.sm, textAlign: 'center', lineHeight: 20 }}>
-            请打出 APK 安装后在真机上体验原生摄像头 AI 姿态分析！
-          </Text>
-        </View>
-      </Screen>
-    );
-  }
-  return <PoseCameraView />;
-}
-
-function PoseCameraView() {
   const router = useRouter();
   const [action, setAction] = useState<ActionType>('clear');
   const [running, setRunning] = useState(false);
@@ -60,35 +26,30 @@ function PoseCameraView() {
   const [frameData, setFrameData] = useState<Keypoint[] | null>(null);
   const [issues, setIssues] = useState<FeedbackIssue[]>([]);
   const [score, setScore] = useState<number | null>(null);
-  const [modelError, setModelError] = useState<string | null>(null);
 
   const { width } = Dimensions.get('window');
   const camHeight = Math.round((width * 4) / 3);
 
-  const { hasPermission, requestPermission } = useCameraPermission();
-  const device = useCameraDevice('front');
-  
-  const { model, frameProcessor } = useMovenet((kps, errorMsg) => {
-    if (errorMsg) {
-      setModelError(errorMsg);
+  // 纯 JS 模拟的数据源 (完全抛弃原生 Camera)
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!running) {
+      if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
-    if (running) {
-      setModelError(null);
-      setFrameData(kps);
-    }
-  });
-
-  useEffect(() => {
-    if (!hasPermission) requestPermission();
-  }, [hasPermission, requestPermission]);
-
-  useEffect(() => {
-    if (!frameData || !running) return;
-    const result = analyzeFrame(action, frameData);
-    setIssues(result.issues);
-    setScore(result.score);
-  }, [frameData, running, action]);
+    const start = Date.now();
+    timerRef.current = setInterval(() => {
+      const f = mockFrame(Date.now() - start);
+      setFrameData(f);
+      const result = analyzeFrame(action, f);
+      setIssues(result.issues);
+      setScore(result.score);
+    }, 100); // 10fps 演示足矣
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [running, action]);
 
   async function stop() {
     if (!startedAt) {
@@ -136,59 +97,18 @@ function PoseCameraView() {
       </View>
 
       <View style={[styles.cameraWrap, { height: camHeight }]}>
-        {hasPermission && device ? (
-          <Camera
-            style={StyleSheet.absoluteFill}
-            device={device}
-            isActive={running}
-            frameProcessor={frameProcessor}
-            pixelFormat="yuv"
-          />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, styles.permissionWrap]}>
-            <Text style={styles.permissionText}>
-              {hasPermission ? '未找到前置摄像头' : '需要摄像头权限以识别动作'}
-            </Text>
-            {!hasPermission && (
-              <Button title="授权摄像头" onPress={requestPermission} style={{ marginTop: spacing.md }} />
-            )}
-          </View>
-        )}
+        {/* 纯黑背景代替摄像头 */}
+        <View style={StyleSheet.absoluteFill} />
 
         <SkeletonOverlay frame={frameData} width={width} height={camHeight} mirrored />
 
-        {/* 模型状态提示 */}
         <View style={styles.mockBadge}>
           <Text style={styles.mockText}>
-            🧠 AI {
-              model.state === 'loaded' ? '已就绪' : 
-              model.state === 'mock' ? '降级 Mock 模式' :
-              model.state === 'error' ? '加载失败' : '加载中...'
-            }
+            📡 引擎演示模式
           </Text>
         </View>
 
-        {/* 测试信息：把接收到的原始帧数据直接打印在屏幕上 */}
-        {frameData && frameData.length > 0 && (
-          <View style={{ position: 'absolute', bottom: 120, left: spacing.md, backgroundColor: 'rgba(0,0,0,0.5)', padding: 4, borderRadius: 4 }}>
-            <Text style={{ color: '#fff', fontSize: 10 }}>
-              AI 原始置信度探测: 
-              {frameData[0]?.score?.toFixed(2)}, {frameData[5]?.score?.toFixed(2)}
-            </Text>
-          </View>
-        )}
-
-        {/* 致命底层报错提示（如果有） */}
-        {(modelError || model.error) && (
-          <View style={{ position: 'absolute', top: 60, left: spacing.md, right: spacing.md, backgroundColor: 'rgba(239, 68, 68, 0.9)', padding: spacing.md, borderRadius: radius.md }}>
-            <Text style={{ color: '#fff', fontSize: font.small, fontWeight: '700' }}>[模型推断异常]</Text>
-            <Text style={{ color: '#fff', fontSize: font.tiny, marginTop: 4 }}>
-              {modelError || (model.error?.message ?? String(model.error))}
-            </Text>
-          </View>
-        )}
-
-        {score !== null && running && !modelError && (
+        {score !== null && running && (
           <View style={styles.scoreBox}>
             <Text style={styles.scoreLabel}>得分</Text>
             <Text style={[styles.scoreVal, { color: scoreColor(score) }]}>{score}</Text>
@@ -199,7 +119,7 @@ function PoseCameraView() {
       <View style={styles.feedback}>
         {issues.length === 0 ? (
           <Text style={styles.feedbackHint}>
-            {running ? '识别中…保持完整身体在画面里' : '选择动作，点开始'}
+            {running ? '正在分析模拟数据...' : '选择动作，点开始查看算法演示'}
           </Text>
         ) : (
           issues.slice(0, 4).map((it, i) => (
@@ -215,7 +135,7 @@ function PoseCameraView() {
 
       <View style={styles.controls}>
         {!running ? (
-          <Button title="▶ 开始识别" onPress={start} style={{ flex: 1 }} />
+          <Button title="▶ 开启算法演示" onPress={start} style={{ flex: 1 }} />
         ) : (
           <Button title="⏹ 停止" variant="danger" onPress={stop} style={{ flex: 1 }} />
         )}
@@ -236,11 +156,9 @@ function scoreColor(s: number) {
 const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.md },
   actionTab: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
-  cameraWrap: { width: '100%', backgroundColor: '#000', borderRadius: radius.lg, overflow: 'hidden', marginBottom: spacing.md },
-  permissionWrap: { alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  permissionText: { color: colors.text, textAlign: 'center' },
-  mockBadge: { position: 'absolute', top: spacing.sm, left: spacing.sm, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.sm },
-  mockText: { color: colors.warn, fontSize: font.tiny },
+  cameraWrap: { width: '100%', backgroundColor: '#0B1220', borderRadius: radius.lg, overflow: 'hidden', marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
+  mockBadge: { position: 'absolute', top: spacing.sm, left: spacing.sm, backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.primary },
+  mockText: { color: colors.primary, fontSize: font.tiny, fontWeight: '700' },
   scoreBox: { position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: 'rgba(0,0,0,0.7)', padding: spacing.sm, borderRadius: radius.md, alignItems: 'center' },
   scoreLabel: { color: colors.textDim, fontSize: font.tiny },
   scoreVal: { fontSize: 28, fontWeight: '800' },
