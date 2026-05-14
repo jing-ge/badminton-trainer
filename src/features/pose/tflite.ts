@@ -25,32 +25,32 @@ if (Platform.OS !== 'web') {
 }
 
 export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void) {
+  const [modelUri, setModelUri] = useState<string | null>(null);
   const [modelState, setModelState] = useState<'loading' | 'loaded' | 'error' | 'mock'>('loading');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // 不再使用本地 require 和 AssetManager 读取大文件，彻底规避 Android OOM 内存溢出！
-  // 直接让 TFLite 底层通过 url 下载和缓存模型！这样只会走底层 C++ 的文件流缓冲。
-  // 下载后会被自动缓存，下次即使没有网络也能直接加载缓存。
-  const modelUrl = 'https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/3?lite-format=tflite';
-
-  const baseModel = useTensorflowModel({ url: modelUrl });
-
+  // 用 expo-asset 把本地模型从 APK 中提取到设备文件系统，使用 file:// 协议传给 TFLite
+  // 由于我们启用了 android:largeHeap="true"，App 现在拥有最高 512MB 的堆内存可以做这一步
   useEffect(() => {
-    if (baseModel?.state === 'loaded') {
-      setModelState('loaded');
-    } else if (baseModel?.state === 'error') {
-      setModelState('error');
-    }
-  }, [baseModel?.state]);
-
-  // 超时兜底：如果 8 秒后模型还不行（可能首次下载比较慢），降级到 mock
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setModelState((prev) => {
-        if (prev === 'loading' || prev === 'error') return 'mock';
-        return prev;
-      });
-    }, 8000);
-    return () => clearTimeout(timer);
+    if (Platform.OS === 'web') return;
+    (async () => {
+      try {
+        const asset = Asset.fromModule(require('../../../assets/models/movenet_lightning.tflite'));
+        await asset.downloadAsync();
+        let uri = asset.localUri || asset.uri;
+        if (uri) {
+          // 修补 file:// 协议头，防止 TFLite 底层 MalformedURLException
+          if (uri.startsWith('/') || uri.startsWith('assets_')) {
+            uri = `file://${uri.startsWith('/') ? '' : '/'}${uri}`;
+          }
+          setModelUri(uri);
+        } else {
+          setLoadError('无法获取模型本地路径');
+        }
+      } catch (err: any) {
+        setLoadError(`模型读取失败: ${err.message || String(err)}`);
+      }
+    })();
   }, []);
 
   const baseModel = useTensorflowModel(modelUri ? { url: modelUri } : null);
@@ -88,7 +88,7 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
       if (Math.random() < 0.1 && onFrameJS) {
         const fakeKps: Keypoint[] = [];
         for (let i = 0; i < 17; i++) {
-          fakeKps.push({ x: 0.5, y: 0.5, score: 0.8 }); // 简化
+          fakeKps.push({ x: 0.5, y: 0.5, score: 0.8 });
         }
         onFrameJS(fakeKps);
       }
@@ -99,7 +99,7 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
       return;
     }
     
-    // 【终极 OOM 防御】: 极度暴力随机丢帧！
+    // 【终极 OOM 防御】: 极度暴力随机丢帧！(30fps -> 3fps)
     if (Math.random() > 0.1) {
       return;
     }
@@ -134,7 +134,7 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
     model: {
       ...baseModel,
       state: modelState,
-      error: baseModel.error
+      error: baseModel.error || (loadError ? new Error(loadError) : undefined)
     }, 
     frameProcessor 
   };
