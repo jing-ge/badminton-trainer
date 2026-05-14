@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
+import * as NavigationBar from 'expo-navigation-bar';
 import { getDB } from '@/db';
 import { colors } from '@/theme/tokens';
 
@@ -12,8 +13,14 @@ export default function RootLayout() {
   useEffect(() => {
     getDB().catch((e) => console.warn('DB init failed', e));
     
-    // 强制将系统背景（包括下拉回弹和底部安全区）设为深蓝色，防止出现白边
+    // 强制将系统背景设为深蓝色
     SystemUI.setBackgroundColorAsync(colors.bg).catch(()=>{});
+
+    // 强制 Android 底部系统导航栏（小白条/三大刚键）的背景色和图标颜色
+    if (Platform.OS === 'android') {
+      NavigationBar.setBackgroundColorAsync(colors.bg).catch(()=>{});
+      NavigationBar.setButtonStyleAsync('light').catch(()=>{});
+    }
   }, []);
 
   return (
