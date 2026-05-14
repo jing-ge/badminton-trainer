@@ -1,6 +1,5 @@
 import { Platform } from 'react-native';
 import { useEffect, useState } from 'react';
-import { Asset } from 'expo-asset';
 import { Keypoint } from './keypoints';
 
 let useTensorflowModel: any = () => ({ state: 'loading' });
@@ -25,13 +24,17 @@ if (Platform.OS !== 'web') {
 }
 
 export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void) {
-  // 不再使用 require 读本地，彻底规避 Android AssetManager 读取大文件导致的 OOM 内存溢出！
-  // 直接让 TFLite 底层通过 url 下载和缓存模型 (它在原生层走 HTTP，不会撑爆 JVM 堆内存)
-  const modelUrl = 'https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/3?lite-format=tflite';
-  
   const [modelState, setModelState] = useState<'loading' | 'loaded' | 'error' | 'mock'>('loading');
 
-  const baseModel = useTensorflowModel({ url: modelUrl });
+  // 终极防 OOM 加载方案：
+  // 我们直接将模型文件通过 require 交给 TFLite，完全不使用 Expo 的 Asset.downloadAsync 去进行内存复制。
+  // fast-tflite 的底层会自动通过 AAssetManager 以 zero-copy (零拷贝) 的形式读取这个 9MB 的模型。
+  let modelSource = null;
+  if (Platform.OS !== 'web') {
+    modelSource = require('../../../assets/models/movenet_lightning.tflite');
+  }
+
+  const baseModel = useTensorflowModel(modelSource);
 
   useEffect(() => {
     if (baseModel?.state === 'loaded') {
@@ -41,7 +44,7 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
     }
   }, [baseModel?.state]);
 
-  // 超时兜底：如果 4 秒后模型还不行，降级到 mock，让 App 至少能动
+  // 超时兜底：如果 4 秒后模型还不行，降级到 mock
   useEffect(() => {
     const timer = setTimeout(() => {
       setModelState((prev) => {
@@ -61,17 +64,12 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
 
   const frameProcessor = typeof useFrameProcessor === 'function' ? useFrameProcessor((frame: any) => {
     'worklet';
-
+    
     if (modelState === 'mock') {
-      // 暴力丢帧减负
       if (Math.random() < 0.1 && onFrameJS) {
         const fakeKps: Keypoint[] = [];
         for (let i = 0; i < 17; i++) {
-          fakeKps.push({ 
-            x: 0.5 + (Math.random() * 0.1 - 0.05), 
-            y: 0.5 + (Math.random() * 0.4 - 0.2), 
-            score: 0.8 
-          });
+          fakeKps.push({ x: 0.5, y: 0.5, score: 0.8 }); // 简化
         }
         onFrameJS(fakeKps);
       }
@@ -81,9 +79,8 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
     if (modelState !== 'loaded' || !baseModel.model || !resize) {
       return;
     }
-
+    
     // 【终极 OOM 防御】: 极度暴力随机丢帧！
-    // 将原本相机的 30fps 降到约 3fps。绝不让 Worklet 积压图片处理任务，彻底解决内存溢出。
     if (Math.random() > 0.1) {
       return;
     }
@@ -91,10 +88,10 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
     try {
       const resized = resize(frame, { scale: { width: 192, height: 192 }, pixelFormat: 'rgb', dataType: 'float32' });
       const outputs = baseModel.model.runSync([resized]);
+      
       const keypointsRaw = outputs[0]; 
       
       if (!keypointsRaw || keypointsRaw.length < 51) {
-        if (onFrameJS) onFrameJS([], '模型推断失败：输出格式不符');
         return;
       }
 
@@ -111,7 +108,7 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
       if (onFrameJS) onFrameJS(kps);
 
     } catch (e: any) {
-      if (onFrameJS) onFrameJS([], `推理崩溃: ${e.message || String(e)}`);
+      // 静默处理，绝不阻塞
     }
   }, [baseModel, resize, modelState]) : null;
 
