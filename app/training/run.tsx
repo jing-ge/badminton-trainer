@@ -19,10 +19,10 @@ import { TacticsAnimation } from '@/components/animations/TacticsAnimation';
 import { defaultPlans } from '@/data/presets';
 
 const BGM_LIST = [
-  { id: 'electronic', name: '动感电子', file: require('../../assets/sounds/bgm_electronic.mp3') },
-  { id: 'relax', name: '轻松纯音', file: require('../../assets/sounds/bgm_relax.mp3') },
-  { id: 'epic', name: '史诗激昂', file: require('../../assets/sounds/bgm_epic.mp3') },
-  { id: 'none', name: '无音乐', file: null }
+  { id: 'electronic', name: '动感电子', uri: 'https://upload.wikimedia.org/wikipedia/commons/e/ec/Electronic_music_loop.ogg' },
+  { id: 'relax', name: '轻松纯音', uri: 'https://upload.wikimedia.org/wikipedia/commons/5/5b/We_Were_Always_Together.mp3' },
+  { id: 'epic', name: '史诗激昂', uri: 'https://upload.wikimedia.org/wikipedia/commons/c/c2/Heroic_Age.ogg' },
+  { id: 'none', name: '无音乐', uri: null }
 ];
 
 export default function TrainingRunScreen() {
@@ -61,16 +61,14 @@ export default function TrainingRunScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const hitMod = require('../../assets/sounds/hit.ogg');
-        const squeakMod = require('../../assets/sounds/squeak.ogg');
-        if (hitMod) {
-          const { sound: hitSound } = await Audio.Sound.createAsync(hitMod);
-          sfxHitRef.current = hitSound;
-        }
-        if (squeakMod) {
-          const { sound: squeakSound } = await Audio.Sound.createAsync(squeakMod);
-          sfxSqueakRef.current = squeakSound;
-        }
+        const { sound: hitSound } = await Audio.Sound.createAsync(
+          { uri: 'https://actions.google.com/sounds/v1/foley/hitting_punching_wood.ogg' }
+        );
+        const { sound: squeakSound } = await Audio.Sound.createAsync(
+          { uri: 'https://actions.google.com/sounds/v1/cartoon/slip_and_slide_shoe.ogg' }
+        );
+        sfxHitRef.current = hitSound;
+        sfxSqueakRef.current = squeakSound;
       } catch(e) {
         console.log('SFX load failed:', e);
       }
@@ -88,10 +86,10 @@ export default function TrainingRunScreen() {
       bgmSoundRef.current = null;
     }
     const bgm = BGM_LIST[index];
-    if (bgm.file) {
+    if (bgm.uri) {
       try {
         const { sound } = await Audio.Sound.createAsync(
-          bgm.file,
+          { uri: bgm.uri },
           { shouldPlay: currentStatus === 'running', isLooping: true, volume: 0.15 }
         );
         bgmSoundRef.current = sound;

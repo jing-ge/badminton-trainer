@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
 import { Keypoint } from './keypoints';
 
 let useTensorflowModel: any = () => ({ state: 'loading' });
@@ -26,34 +25,13 @@ if (Platform.OS !== 'web') {
 }
 
 export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void) {
-  const [modelUri, setModelUri] = useState<string | null>(null);
-  const [assetError, setAssetError] = useState<string | null>(null);
+  // 不再使用 require 读本地，彻底规避 Android AssetManager 读取大文件导致的 OOM 内存溢出！
+  // 直接让 TFLite 底层通过 url 下载和缓存模型 (它在原生层走 HTTP，不会撑爆 JVM 堆内存)
+  const modelUrl = 'https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/3?lite-format=tflite';
+  
   const [modelState, setModelState] = useState<'loading' | 'loaded' | 'error' | 'mock'>('loading');
 
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    (async () => {
-      try {
-        const mod = require('../../../assets/models/movenet_lightning.tflite');
-        if (!mod) throw new Error('tflite asset is undefined');
-        const asset = Asset.fromModule(mod);
-        await asset.downloadAsync();
-        if (asset.localUri) {
-          setModelUri(asset.localUri);
-        } else if (asset.uri) {
-          setModelUri(asset.uri);
-        } else {
-          setAssetError('模型 Asset 解析失败');
-        }
-      } catch (err: any) {
-        setAssetError(`模型加载出错: ${err.message || String(err)}`);
-      }
-    })();
-  }, []);
-
-  // react-native-fast-tflite 1.3.0 要求 source 参数必须是 require 或者是 { url: string } 对象
-  // 我们把它包裹在对象里
-  const baseModel = useTensorflowModel(modelUri ? { url: modelUri } : null);
+  const baseModel = useTensorflowModel({ url: modelUrl });
 
   useEffect(() => {
     if (baseModel?.state === 'loaded') {
@@ -83,9 +61,9 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
 
   const frameProcessor = typeof useFrameProcessor === 'function' ? useFrameProcessor((frame: any) => {
     'worklet';
-    
-    // 如果处于降级 mock 模式，直接吐出假坐标
+
     if (modelState === 'mock') {
+      // 暴力丢帧减负
       if (Math.random() < 0.1 && onFrameJS) {
         const fakeKps: Keypoint[] = [];
         for (let i = 0; i < 17; i++) {
@@ -101,6 +79,12 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
     }
 
     if (modelState !== 'loaded' || !baseModel.model || !resize) {
+      return;
+    }
+
+    // 【终极 OOM 防御】: 极度暴力随机丢帧！
+    // 将原本相机的 30fps 降到约 3fps。绝不让 Worklet 积压图片处理任务，彻底解决内存溢出。
+    if (Math.random() > 0.1) {
       return;
     }
     
@@ -134,7 +118,6 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
   return { 
     model: {
       ...baseModel,
-      error: baseModel.error || (assetError ? new Error(assetError) : undefined),
       state: modelState
     }, 
     frameProcessor 
