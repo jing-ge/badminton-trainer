@@ -51,7 +51,9 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
     })();
   }, []);
 
-  const baseModel = useTensorflowModel(modelUri);
+  // react-native-fast-tflite 1.3.0 要求 source 参数必须是 require 或者是 { url: string } 对象
+  // 我们把它包裹在对象里
+  const baseModel = useTensorflowModel(modelUri ? { url: modelUri } : null);
 
   useEffect(() => {
     if (baseModel?.state === 'loaded') {
