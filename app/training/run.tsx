@@ -19,10 +19,10 @@ import { TacticsAnimation } from '@/components/animations/TacticsAnimation';
 import { defaultPlans } from '@/data/presets';
 
 const BGM_LIST = [
-  { id: 'electronic', name: '动感电子', uri: 'https://upload.wikimedia.org/wikipedia/commons/e/ec/Electronic_music_loop.ogg' },
-  { id: 'relax', name: '轻松纯音', uri: 'https://upload.wikimedia.org/wikipedia/commons/5/5b/We_Were_Always_Together.mp3' },
-  { id: 'epic', name: '史诗激昂', uri: 'https://upload.wikimedia.org/wikipedia/commons/c/c2/Heroic_Age.ogg' },
-  { id: 'none', name: '无音乐', uri: null }
+  { id: 'electronic', name: '动感电子', file: require('../../assets/sounds/bgm_electronic.mp3') },
+  { id: 'relax', name: '轻松纯音', file: require('../../assets/sounds/bgm_relax.mp3') },
+  { id: 'epic', name: '史诗激昂', file: require('../../assets/sounds/bgm_epic.mp3') },
+  { id: 'none', name: '无音乐', file: null }
 ];
 
 export default function TrainingRunScreen() {
@@ -62,10 +62,10 @@ export default function TrainingRunScreen() {
     (async () => {
       try {
         const { sound: hitSound } = await Audio.Sound.createAsync(
-          { uri: 'https://actions.google.com/sounds/v1/foley/hitting_punching_wood.ogg' }
+          require('../../assets/sounds/hit.ogg')
         );
         const { sound: squeakSound } = await Audio.Sound.createAsync(
-          { uri: 'https://actions.google.com/sounds/v1/cartoon/slip_and_slide_shoe.ogg' }
+          require('../../assets/sounds/squeak.ogg')
         );
         sfxHitRef.current = hitSound;
         sfxSqueakRef.current = squeakSound;
@@ -86,10 +86,10 @@ export default function TrainingRunScreen() {
       bgmSoundRef.current = null;
     }
     const bgm = BGM_LIST[index];
-    if (bgm.uri) {
+    if (bgm.file) {
       try {
         const { sound } = await Audio.Sound.createAsync(
-          { uri: bgm.uri },
+          bgm.file,
           { shouldPlay: currentStatus === 'running', isLooping: true, volume: 0.15 }
         );
         bgmSoundRef.current = sound;

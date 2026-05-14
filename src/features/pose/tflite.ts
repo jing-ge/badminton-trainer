@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { useEffect, useState } from 'react';
+import { Asset } from 'expo-asset';
 import { Keypoint } from './keypoints';
 
 let useTensorflowModel: any = () => ({ state: 'loading' });
@@ -24,17 +25,34 @@ if (Platform.OS !== 'web') {
 }
 
 export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void) {
+  const [modelUri, setModelUri] = useState<string | null>(null);
   const [modelState, setModelState] = useState<'loading' | 'loaded' | 'error' | 'mock'>('loading');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // 终极防 OOM 加载方案：
-  // 我们直接将模型文件通过 require 交给 TFLite，完全不使用 Expo 的 Asset.downloadAsync 去进行内存复制。
-  // fast-tflite 的底层会自动通过 AAssetManager 以 zero-copy (零拷贝) 的形式读取这个 9MB 的模型。
-  let modelSource = null;
-  if (Platform.OS !== 'web') {
-    modelSource = require('../../../assets/models/movenet_lightning.tflite');
-  }
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    (async () => {
+      try {
+        const asset = Asset.fromModule(require('../../../assets/models/movenet_lightning.tflite'));
+        await asset.downloadAsync();
+        
+        let uri = asset.localUri || asset.uri;
+        if (uri) {
+          // 确保带有 file:// 协议头，否则底层 C++ URL 解析会报 java.net.MalformedURLException: no protocol
+          if (uri.startsWith('/') || uri.startsWith('assets_')) {
+            uri = `file://${uri.startsWith('/') ? '' : '/'}${uri}`;
+          }
+          setModelUri(uri);
+        } else {
+          setLoadError('无法获取模型文件的有效路径');
+        }
+      } catch (err: any) {
+        setLoadError(`模型文件提取失败: ${err.message || String(err)}`);
+      }
+    })();
+  }, []);
 
-  const baseModel = useTensorflowModel(modelSource);
+  const baseModel = useTensorflowModel(modelUri ? { url: modelUri } : null);
 
   useEffect(() => {
     if (baseModel?.state === 'loaded') {
@@ -97,12 +115,11 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
 
       const kps: Keypoint[] = [];
       for (let i = 0; i < 17; i++) {
-        // AI 的预测坐标 y 和 x 经常因为手机的前置摄像头默认是横向(landscape)的而相互倒置，
-        // 且 MoveNet 默认输出是 [Y, X, Score]
-        const y = Number(keypointsRaw[i * 3]);
-        const x = Number(keypointsRaw[i * 3 + 1]);
-        const score = Number(keypointsRaw[i * 3 + 2]);
-        kps.push({ x, y, score });
+        kps.push({ 
+          x: Number(keypointsRaw[i * 3 + 1]), 
+          y: Number(keypointsRaw[i * 3]), 
+          score: Number(keypointsRaw[i * 3 + 2]) 
+        });
       }
 
       if (onFrameJS) onFrameJS(kps);
@@ -115,7 +132,8 @@ export function useMovenet(onFrame: (kps: Keypoint[], errorMsg?: string) => void
   return { 
     model: {
       ...baseModel,
-      state: modelState
+      state: modelState,
+      error: baseModel.error || (loadError ? new Error(loadError) : undefined)
     }, 
     frameProcessor 
   };

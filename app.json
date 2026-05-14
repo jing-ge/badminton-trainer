@@ -12,6 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0B1220"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.you.badmintontrainer",
