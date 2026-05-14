@@ -19,11 +19,21 @@ import { TacticsAnimation } from '@/components/animations/TacticsAnimation';
 import { defaultPlans } from '@/data/presets';
 
 const BGM_LIST = [
-  { id: 'electronic', name: '动感电子', file: require('../../assets/sounds/bgm_electronic.mp3') },
-  { id: 'relax', name: '轻松纯音', file: require('../../assets/sounds/bgm_relax.mp3') },
-  { id: 'epic', name: '史诗激昂', file: require('../../assets/sounds/bgm_epic.mp3') },
-  { id: 'none', name: '无音乐', file: null }
+  { id: 'electronic', name: '动感电子' },
+  { id: 'relax', name: '轻松纯音' },
+  { id: 'epic', name: '史诗激昂' },
+  { id: 'none', name: '无音乐' }
 ];
+
+// 使用按需获取 require，防止顶层三个大体积 mp3 被同时装载挤爆内存
+function getBgmFile(id: string) {
+  switch (id) {
+    case 'electronic': return require('../../assets/sounds/bgm_electronic.mp3');
+    case 'relax': return require('../../assets/sounds/bgm_relax.mp3');
+    case 'epic': return require('../../assets/sounds/bgm_epic.mp3');
+    default: return null;
+  }
+}
 
 export default function TrainingRunScreen() {
   const { mid, plan_id } = useLocalSearchParams<{ mid?: string; plan_id?: string }>();
@@ -86,10 +96,11 @@ export default function TrainingRunScreen() {
       bgmSoundRef.current = null;
     }
     const bgm = BGM_LIST[index];
-    if (bgm.file) {
+    const file = getBgmFile(bgm.id);
+    if (file) {
       try {
         const { sound } = await Audio.Sound.createAsync(
-          bgm.file,
+          file,
           { shouldPlay: currentStatus === 'running', isLooping: true, volume: 0.15 }
         );
         bgmSoundRef.current = sound;
