@@ -12,14 +12,11 @@
       "resizeMode": "contain",
       "backgroundColor": "#0B1220"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.you.badmintontrainer",
       "infoPlist": {
-        "NSCameraUsageDescription": "需要使用摄像头识别羽毛球动作",
+        "NSCameraUsageDescription": "需要使用摄像头进行动作识别与录像复盘",
         "NSMicrophoneUsageDescription": "录像复盘时需要录音",
         "NSPhotoLibraryUsageDescription": "用于导入对战录像"
       }
@@ -62,15 +59,22 @@
         }
       ],
       "expo-font",
-      "react-native-fast-tflite"
+      "react-native-fast-tflite",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraManifestAttributes": {
+              "android:largeHeap": "true"
+            }
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
-      "router": {
-        "origin": false
-      },
       "eas": {
         "projectId": "07019ed4-b74e-48c3-9f02-09cc5112589a"
       }
