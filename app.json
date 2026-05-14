@@ -45,21 +45,12 @@
     "plugins": [
       "expo-router",
       [
-        "react-native-vision-camera",
-        {
-          "cameraPermissionText": "需要使用摄像头识别羽毛球动作",
-          "enableMicrophonePermission": true,
-          "microphonePermissionText": "录像复盘时需要录音"
-        }
-      ],
-      [
         "expo-notifications",
         {
           "color": "#10B981"
         }
       ],
       "expo-font",
-      "react-native-fast-tflite",
       [
         "expo-build-properties",
         {
