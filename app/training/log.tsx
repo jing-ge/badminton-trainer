@@ -26,8 +26,14 @@ export default function TrainingLogScreen() {
   async function save() {
     const min = parseInt(duration, 10);
     if (!min || min <= 0) {
-      Alert.alert('请输入训练时长');
+      if (Platform.OS === 'web') window.alert('训练时长至少 1 分钟');
+      else Alert.alert('请输入训练时长', '训练时长至少 1 分钟');
       return;
+    }
+    if (min > 480) {
+      // 超过 8 小时,确认一次而非直接拦
+      const ok = await confirmLongSession(min);
+      if (!ok) return;
     }
     await insertTrainingLog({
       duration_min: min,
@@ -48,6 +54,20 @@ export default function TrainingLogScreen() {
     Alert.alert('打卡成功！', '坚持训练，进步看得见 💪', [
       { text: '好', onPress: () => router.replace('/stats') },
     ]);
+  }
+
+  function confirmLongSession(min: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const msg = `你录入的训练时长 ${min} 分钟超过 8 小时,确认无误吗?`;
+      if (Platform.OS === 'web') {
+        resolve(window.confirm(msg));
+        return;
+      }
+      Alert.alert('时长偏长,请确认', msg, [
+        { text: '取消', style: 'cancel', onPress: () => resolve(false) },
+        { text: '确认保存', onPress: () => resolve(true) },
+      ]);
+    });
   }
 
   return (

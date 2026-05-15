@@ -60,6 +60,10 @@ export default function TrainingRunScreen() {
 
   const [conditionScale, setConditionScale] = useState<number>(1.0); // 身体状态缩放系数
 
+  // 拖拽进度条时,用 dragging 屏蔽真实 setTimeLeft 节流避免 timer 重建
+  const [dragValue, setDragValue] = useState<number | null>(null);
+  const [currentItemDurationSec, setCurrentItemDurationSec] = useState(0); // 当前项总时长(应用 conditionScale 后),用于进度条
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 背景音乐和音效引用
@@ -69,6 +73,9 @@ export default function TrainingRunScreen() {
 
   // 预加载音效
   useEffect(() => {
+    let cancelled = false;
+    let hitSnd: Audio.Sound | null = null;
+    let squeakSnd: Audio.Sound | null = null;
     (async () => {
       try {
         const { sound: hitSound } = await Audio.Sound.createAsync(
@@ -77,6 +84,14 @@ export default function TrainingRunScreen() {
         const { sound: squeakSound } = await Audio.Sound.createAsync(
           require('../../assets/sounds/squeak.ogg')
         );
+        if (cancelled) {
+          // 组件已卸载,立刻 unload 防泄漏
+          hitSound.unloadAsync().catch(() => {});
+          squeakSound.unloadAsync().catch(() => {});
+          return;
+        }
+        hitSnd = hitSound;
+        squeakSnd = squeakSound;
         sfxHitRef.current = hitSound;
         sfxSqueakRef.current = squeakSound;
       } catch(e) {
@@ -84,9 +99,12 @@ export default function TrainingRunScreen() {
       }
     })();
     return () => {
-      sfxHitRef.current?.unloadAsync();
-      sfxSqueakRef.current?.unloadAsync();
-      bgmSoundRef.current?.unloadAsync();
+      cancelled = true;
+      hitSnd?.unloadAsync().catch(() => {});
+      squeakSnd?.unloadAsync().catch(() => {});
+      bgmSoundRef.current?.unloadAsync().catch(() => {});
+      sfxHitRef.current = null;
+      sfxSqueakRef.current = null;
     };
   }, []);
 
@@ -115,6 +133,17 @@ export default function TrainingRunScreen() {
   useEffect(() => {
     loadBgm(bgmIndex, status);
   }, [bgmIndex]);
+
+  // BGM 跟随 status 暂停/继续(独立 effect,避免与计时器 effect 互相干扰导致重复 play 警告)
+  useEffect(() => {
+    const s = bgmSoundRef.current;
+    if (!s) return;
+    if (status === 'running') {
+      s.playAsync().catch(() => {});
+    } else {
+      s.pauseAsync().catch(() => {});
+    }
+  }, [status]);
 
   useEffect(() => {
     (async () => {
@@ -149,46 +178,46 @@ export default function TrainingRunScreen() {
     };
   }, [mid]);
 
+  // 准备期倒计时(独立 effect)
   useEffect(() => {
-    if (status === 'preparing') {
-      bgmSoundRef.current?.pauseAsync();
-      timerRef.current = setInterval(() => {
-        setPrepTime((prev) => {
-          if (prev <= 1) {
-            stopTimer();
-            setStatus('running');
-            vibrateMedium();
-            return 0;
-          }
-          speak(String(prev - 1), 1.5);
-          vibrateLight();
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (status === 'running' && timeLeft > 0) {
-      bgmSoundRef.current?.playAsync();
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            handleItemFinish();
-            return 0;
-          }
-          
-          const currentItem = items[currentIndexRef.current];
-          const totalSec = currentItem.duration_min * 60;
-          const elapsed = totalSec - prev;
-          
-          runGhostCoach(currentItem, prev, elapsed);
-          
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      bgmSoundRef.current?.pauseAsync();
-      stopTimer();
-    }
+    if (status !== 'preparing') return;
+    timerRef.current = setInterval(() => {
+      setPrepTime((prev) => {
+        if (prev <= 1) {
+          stopTimer();
+          setStatus('running');
+          vibrateMedium();
+          return 0;
+        }
+        speak(String(prev - 1), 1.5);
+        vibrateLight();
+        return prev - 1;
+      });
+    }, 1000);
     return stopTimer;
-  }, [status, timeLeft]);
+  }, [status]);
+
+  // 训练运行倒计时(只依赖 status,内部用函数式 setTimeLeft 读最新值,避免 timeLeft 变化重建 interval)
+  useEffect(() => {
+    if (status !== 'running') return;
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          // 用 setTimeout 让本轮 state 更新完成后再 finish,避免在 setter 内部直接改 status 触发警告
+          setTimeout(() => handleItemFinish(), 0);
+          return 0;
+        }
+        const currentItem = items[currentIndexRef.current];
+        if (currentItem) {
+          const totalSec = Math.max(1, Math.round(currentItem.duration_min * conditionScale)) * 60;
+          const elapsed = totalSec - prev;
+          runGhostCoach(currentItem, prev, elapsed);
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return stopTimer;
+  }, [status, items, conditionScale]);
 
   function stopTimer() {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -327,7 +356,9 @@ export default function TrainingRunScreen() {
     
     // 应用身体状态缩放系数，最小不低于 1 分钟
     const scaledMin = Math.max(1, Math.round(it.duration_min * conditionScale));
-    setTimeLeft(scaledMin * 60);
+    const scaledSec = scaledMin * 60;
+    setCurrentItemDurationSec(scaledSec);
+    setTimeLeft(scaledSec);
     
     let text = `下一个动作：${it.name}，时长 ${scaledMin} 分钟。`;
     if (it.notes) text += `注意：${it.notes}`;
@@ -504,6 +535,15 @@ export default function TrainingRunScreen() {
   const currentItem = items[currentIndex];
   const nextItem = currentIndex + 1 < items.length ? items[currentIndex + 1] : null;
 
+  // 全局进度: 已完成项数 + 当前项已完成比例,除以总项数
+  const currentItemProgress = currentItemDurationSec > 0
+    ? Math.max(0, Math.min(1, (currentItemDurationSec - timeLeft) / currentItemDurationSec))
+    : 0;
+  const overallProgress = items.length > 0
+    ? (currentIndex + currentItemProgress) / items.length
+    : 0;
+  const progressBarColor = status === 'paused' ? colors.textDim : colors.primary;
+
   return (
     <View style={{ flex: 1 }}>
       <Screen scroll={false} transparent={true}>
@@ -540,6 +580,11 @@ export default function TrainingRunScreen() {
             ))}
           </View>
         )}
+
+        {/* 全局训练进度条 */}
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${Math.round(overallProgress * 100)}%`, backgroundColor: progressBarColor }]} />
+        </View>
 
         <View style={styles.mainBox}>
           {currentItem.animationType?.startsWith('footwork') ? (
@@ -587,14 +632,20 @@ export default function TrainingRunScreen() {
             <Text style={styles.coachHint}>🎧 虚拟教练正在随机报点...</Text>
           )}
 
-          {/* 新增: 时间微调滑动条 */}
+          {/* 时间微调滑动条:拖动时仅本地态变化,松手才真正 setTimeLeft 避免重建 timer */}
           <View style={{ width: '80%', marginTop: spacing.lg }}>
             <Slider
               style={{ width: '100%', height: 40 }}
               minimumValue={0}
-              maximumValue={Math.max(1, Math.round(currentItem.duration_min * conditionScale)) * 60}
-              value={timeLeft}
-              onValueChange={(val) => setTimeLeft(Math.floor(val))}
+              maximumValue={Math.max(1, currentItemDurationSec)}
+              value={dragValue ?? timeLeft}
+              onValueChange={(val) => setDragValue(Math.floor(val))}
+              onSlidingComplete={(val) => {
+                const v = Math.max(0, Math.floor(val));
+                setTimeLeft(v);
+                setDragValue(null);
+                vibrateLight();
+              }}
               minimumTrackTintColor={colors.primary}
               maximumTrackTintColor={colors.border}
               thumbTintColor="#fff"
@@ -679,6 +730,8 @@ const styles = StyleSheet.create({
   bgmMenuText: { color: colors.text, fontSize: font.body, textAlign: 'center' },
   navBackBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
   navBackText: { color: colors.text, fontSize: font.small, fontWeight: '600' },
+  progressTrack: { height: 3, backgroundColor: colors.border, marginHorizontal: spacing.md, marginTop: spacing.sm, borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2 },
   mainBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.lg, zIndex: 1 },
   categoryTag: { color: colors.primary, fontSize: font.body, fontWeight: '700', marginBottom: spacing.md },
   currentItemName: { color: colors.text, fontSize: 32, fontWeight: '800', textAlign: 'center', lineHeight: 44 },

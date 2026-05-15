@@ -109,6 +109,23 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.3.0 · 2026-05-15
+
+- **产品需求**：训练执行流（run.tsx）稳定性与可读性升级；修暂停/继续 timer bug、Slider 误触发结束、加全局进度条；统一文案 + 打卡时长上下限守卫。
+- **开发改动**：
+  - `app/training/run.tsx`：把训练倒计时 effect 依赖从 `[status, timeLeft]` 收敛为 `[status, items, conditionScale]`，避免每秒重建 interval 导致计时漂移；BGM 控制抽独立 effect；准备期倒计时也拆为独立 effect；预加载 sfx 加 `cancelled` 守卫避免 race；新增全局训练进度条（顶部 3px 细条）；Slider 改用 `onSlidingComplete` + 本地 `dragValue` 临时态，拖动不再重建 timer 也不会瞬间触发完成。
+  - `app/training/today.tsx`、`app/training/module/[id].tsx`：文案"直接去打卡 (已在线下完成)" → "我已在线下完成此训练 →"，消除"线下完成"歧义。
+  - `app/training/log.tsx`：时长 < 1 分钟提示并拒绝；> 480 分钟弹确认对话框（Web 走 `window.confirm`，原生走 `Alert`），允许但二次确认。
+- **测试结论**：
+  - ✅ 暂停/继续逻辑（计时只在 `status` 切换时建立/销毁 interval）
+  - ✅ Slider 拖动不再触发 finish（`onValueChange` 只改本地态）
+  - ✅ 进度条颜色随 paused 变灰（`progressBarColor` 逻辑）
+  - ✅ sfx 加载 race（cancelled 标志位 + 局部变量）
+  - ✅ 文案 grep 验证："已在线下完成" 已无残留
+  - ⚠️ run.tsx 单文件已 730+ 行，建议下一轮拆分为 hook（`useWorkoutTimer` / `useGhostCoach`）
+  - ⚠️ 真机暂停/继续与 BGM 同步需回归
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.2.0 · 2026-05-15
 
 - **产品需求**：清理首页与「我的」Tab 的功能错位与跳转盲区，打通新用户首启与空数据态。

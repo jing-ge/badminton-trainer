@@ -70,7 +70,7 @@ export default function ModuleDetailScreen() {
         onPress={() => router.push({ pathname: '/training/log', params: { plan_id: planId, mins: String(totalMin) } })}
         style={{ marginTop: spacing.md, paddingVertical: spacing.md }}
       >
-        <Text style={{ color: colors.textDim, textAlign: 'center' }}>直接去打卡 (已在线下完成)</Text>
+        <Text style={{ color: colors.textDim, textAlign: 'center' }}>我已在线下完成此训练 →</Text>
       </Pressable>
     </Screen>
   );
