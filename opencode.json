@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "product": {
+      "model": "jdcloud-anthropic/Claude-Opus-4.7"
+    },
+    "developer": {
+      "model": "jdcloud-anthropic/Claude-Opus-4.7"
+    },
+    "tester": {
+      "model": "jdcloud-gemini/Gemini-3.1-Pro-Preview"
+    }
+  }
+}
