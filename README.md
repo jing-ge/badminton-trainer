@@ -109,6 +109,21 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.10.0 · 2026-05-15
+
+- **产品需求**：训练 run 页项间「Next Up + 深呼吸」过渡态 + Running 期 NextBox 信息密度补齐。
+- **开发改动**：
+  - `app/training/run.tsx`：`status` 新增 `transitioning` 状态；`handleItemFinish` 的非最后一项分支从 `setTimeout` 等待改写为 5 秒状态过渡。
+  - `app/training/run.tsx`：更新了底部 `nextBox` 的样式结构（emoji 徽章 + 双行文本布局，最后一项特殊样式 `🏁 这是最后一项`）。
+  - `src/features/run/TransitionScene.tsx`：新增 `TransitionScene` 组件，实现了 ✅进度徽章、倒数呼吸圆（基于 reanimated 与震动同步），以及项间预览卡和「直接开始」按钮。
+- **测试结论**：
+  - ✅ status state transition 正常流转（`running` -> `transitioning` -> `preparing/running`）；没有误改首项 `startWorkout` 流程及最后一项的 `finished` 分支。
+  - ✅ 计时器 effect 对 `status === 'running'` 及 `status === 'transitioning'` 独立区分；`transitioning` 时全局进度强制视当前项已满（`currentItemProgress = 1`）。
+  - ✅ TransitionScene 中 `vibrateMedium` 在进入时触发，且呼吸圈缩放的最深点成功挂载了轻震动 `vibrateLight`。
+  - ✅ 跳过逻辑兜底正常，次态手动推进有效，BGM 不会在 `transitioning` 时错误停止。
+  - ✅ 原有的 `preparing`, `idle` 状态未受污染。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.9.0 · 2026-05-15
 
 - **产品需求**：首页「连击勋章卡」5 状态化 + 破纪录里程碑吐司。

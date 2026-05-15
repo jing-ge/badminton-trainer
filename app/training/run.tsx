@@ -14,8 +14,25 @@ import { selectToday } from '@/data/selectToday';
 import type { TrainingItem, TrainingModule } from '@/data/planTypes';
 import { TutorialMedia } from '@/components/animations/TutorialMedia';
 import { getStreak, listTrainingLogs } from '@/db/trainingLogs';
+import { TransitionScene } from '@/features/run/TransitionScene';
 
 import { defaultPlans } from '@/data/presets';
+
+const TRANSITION_SECONDS = 5;
+
+const CATEGORY_EMOJI: Record<string, string> = {
+  tech: '🏸',
+  footwork: '👟',
+  fitness: '💪',
+  match: '🎯',
+};
+const CATEGORY_LABEL: Record<string, string> = {
+  tech: '技术',
+  footwork: '步法',
+  fitness: '体能',
+  match: '对抗',
+  recovery: '恢复',
+};
 
 const BGM_LIST = [
   { id: 'electronic', name: '动感电子' },
@@ -54,8 +71,9 @@ export default function TrainingRunScreen() {
   }
 
   const [timeLeft, setTimeLeft] = useState(0); // 当前项剩余秒数
-  const [status, setStatus] = useState<'idle' | 'preparing' | 'running' | 'paused' | 'finished'>('idle');
+  const [status, setStatus] = useState<'idle' | 'preparing' | 'running' | 'paused' | 'transitioning' | 'finished'>('idle');
   const [prepTime, setPrepTime] = useState(5); // 准备期倒计时
+  const [transitionLeft, setTransitionLeft] = useState(TRANSITION_SECONDS); // 项间过渡倒计时
 
   const [conditionScale, setConditionScale] = useState<number>(1.0); // 身体状态缩放系数
 
@@ -123,7 +141,7 @@ export default function TrainingRunScreen() {
       try {
         const { sound } = await Audio.Sound.createAsync(
           file,
-          { shouldPlay: currentStatus === 'running', isLooping: true, volume: 0.15 }
+          { shouldPlay: currentStatus === 'running' || currentStatus === 'transitioning', isLooping: true, volume: 0.15 }
         );
         bgmSoundRef.current = sound;
       } catch (e) {
@@ -141,7 +159,7 @@ export default function TrainingRunScreen() {
   useEffect(() => {
     const s = bgmSoundRef.current;
     if (!s) return;
-    if (status === 'running') {
+    if (status === 'running' || status === 'transitioning') {
       s.playAsync().catch(() => {});
     } else {
       s.pauseAsync().catch(() => {});
@@ -221,6 +239,25 @@ export default function TrainingRunScreen() {
     }, 1000);
     return stopTimer;
   }, [status, items, conditionScale]);
+
+  // 项间「Next Up + 深呼吸」过渡倒计时（v0.10.0）
+  useEffect(() => {
+    if (status !== 'transitioning') return;
+    timerRef.current = setInterval(() => {
+      setTransitionLeft((prev) => {
+        if (prev <= 1) {
+          stopTimer();
+          // 倒数完成 → 进入下一项的常规 startItem 流程
+          startItem(currentIndexRef.current + 1);
+          return 0;
+        }
+        // 在「呼气最深处」（4→3 切换瞬间，约第 2 秒末）震一次 light，每个 transitioning 周期只震 1 次
+        if (prev === 4) vibrateLight();
+        return prev - 1;
+      });
+    }, 1000);
+    return stopTimer;
+  }, [status]);
 
   // 进入 finished：拉一次 streak + 判定今日是否已打卡，并跑徽章入场动画
   useEffect(() => {
@@ -404,11 +441,16 @@ export default function TrainingRunScreen() {
   function handleItemFinish() {
     stopTimer();
     const nextIdx = currentIndexRef.current + 1;
-    vibrateHeavy();
     if (nextIdx < items.length) {
-      speak('时间到。准备休息并进入下一项。');
-      setTimeout(() => startItem(nextIdx), 2500);
+      const nextItem = items[nextIdx];
+      // 防御：理论上 nextIdx < items.length 必有，但兜底直接进下一项
+      if (!nextItem) { startItem(nextIdx); return; }
+      vibrateMedium();
+      speak(`很好，先调整呼吸，下一个是 ${nextItem.name}。`);
+      setTransitionLeft(TRANSITION_SECONDS);
+      setStatus('transitioning');
     } else {
+      vibrateHeavy();
       setStatus('finished');
       vibrateSuccess();
       speak('恭喜你，已完成本次所有训练内容，太棒了！');
@@ -622,11 +664,15 @@ export default function TrainingRunScreen() {
 
   const currentItem = items[currentIndex];
   const nextItem = currentIndex + 1 < items.length ? items[currentIndex + 1] : null;
+  const nextScaledMin = nextItem ? Math.max(1, Math.round(nextItem.duration_min * conditionScale)) : 0;
 
   // 全局进度: 已完成项数 + 当前项已完成比例,除以总项数
-  const currentItemProgress = currentItemDurationSec > 0
-    ? Math.max(0, Math.min(1, (currentItemDurationSec - timeLeft) / currentItemDurationSec))
-    : 0;
+  // transitioning 时强制 currentItemProgress = 1，让进度条与「已完成 X/Y」徽章对齐
+  const currentItemProgress = status === 'transitioning'
+    ? 1
+    : currentItemDurationSec > 0
+      ? Math.max(0, Math.min(1, (currentItemDurationSec - timeLeft) / currentItemDurationSec))
+      : 0;
   const overallProgress = items.length > 0
     ? (currentIndex + currentItemProgress) / items.length
     : 0;
@@ -674,6 +720,21 @@ export default function TrainingRunScreen() {
           <View style={[styles.progressFill, { width: `${Math.round(overallProgress * 100)}%`, backgroundColor: progressBarColor }]} />
         </View>
 
+        {status === 'transitioning' && nextItem ? (
+          <TransitionScene
+            currentIndex={currentIndex}
+            totalItems={items.length}
+            nextItem={nextItem}
+            scaledMin={nextScaledMin}
+            secondsLeft={transitionLeft}
+            onSkip={() => {
+              vibrateLight();
+              stopTimer();
+              startItem(currentIndexRef.current + 1);
+            }}
+          />
+        ) : (
+          <>
         <View style={styles.mainBox}>
           {currentItem.animationType ? (
             <View style={styles.demoVideoWrap}>
@@ -739,10 +800,30 @@ export default function TrainingRunScreen() {
 
         <View style={styles.bottomArea}>
           <View style={styles.nextBox}>
-            {nextItem ? (
-              <Text style={styles.nextText}>下一个：{nextItem.name} ({nextItem.duration_min}分钟)</Text>
-            ) : (
-              <Text style={styles.nextText}>这是最后一项</Text>
+            {nextItem ? (() => {
+              const emoji = CATEGORY_EMOJI[nextItem.category] ?? '🎯';
+              const catLabel = CATEGORY_LABEL[nextItem.category] ?? '训练';
+              return (
+                <>
+                  <View style={styles.nextBadge}>
+                    <Text style={styles.nextBadgeEmoji}>{emoji}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.nextTitle} numberOfLines={1}>下一个 · {nextItem.name}</Text>
+                    <Text style={styles.nextMeta}>{nextItem.duration_min} 分钟 · {catLabel}</Text>
+                  </View>
+                </>
+              );
+            })() : (
+              <>
+                <View style={[styles.nextBadge, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
+                  <Text style={styles.nextBadgeEmoji}>🏆</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.nextTitle}>🏁 这是最后一项</Text>
+                  <Text style={styles.nextMeta}>坚持到底！</Text>
+                </View>
+              </>
             )}
           </View>
 
@@ -766,6 +847,8 @@ export default function TrainingRunScreen() {
             </Pressable>
           </View>
         </View>
+        </>
+        )}
         </View>
       </Screen>
     </View>
@@ -820,7 +903,28 @@ const styles = StyleSheet.create({
   timer: { color: colors.text, fontSize: 80, fontWeight: '800', fontVariant: ['tabular-nums'], marginTop: spacing.xxl, letterSpacing: 2 },
   coachHint: { color: colors.accent, marginTop: spacing.lg, fontSize: font.small, fontWeight: '600' },
   bottomArea: { paddingBottom: spacing.xl },
-  nextBox: { backgroundColor: colors.cardAlt, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.xl },
+  nextBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardAlt,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.xl,
+  },
+  nextBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    backgroundColor: colors.cardAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  nextBadgeEmoji: { fontSize: 16 },
+  nextTitle: { color: colors.text, fontSize: font.small, fontWeight: '600' },
+  nextMeta: { color: colors.textDim, fontSize: font.tiny, marginTop: 2 },
   nextText: { color: colors.textDim, fontSize: font.small, textAlign: 'center' },
   controls: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl },
   iconBtn: { alignItems: 'center', width: 60 },
