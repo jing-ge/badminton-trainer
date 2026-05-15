@@ -109,6 +109,21 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.4.0 · 2026-05-15
+
+- **产品需求**：教程与计划列表体验补强：搜索能力、CTA 透传 id、空态卡、重名守卫、动画分发组件抽象、危险操作视觉分组。
+- **开发改动**：
+  - `app/(tabs)/library.tsx`：新增搜索框（按 title + keyPoints 模糊匹配，与 category tab 二者 AND），无结果空态卡，输入非空显示清空按钮。
+  - `app/tutorial/[id].tsx`：CTA 跳 `/pose` 时携带 `tutorial=t.id` 参数；4 套 animationType `if` 链替换为 `<TutorialMedia>` 一行调用。
+  - `app/plans/index.tsx`：「我的计划」区块即使为空也展示，给虚线引导卡；创建同名计划自动追加 ` (2)`/`(3)`；PlanCard 操作行的「删除」推到右侧并加左侧分隔线，降低误触。
+  - `src/components/animations/TutorialMedia.tsx`：新建复用组件，统一 footwork/shuttle/fitness/tactics 四类动画的容器与分发逻辑。
+- **测试结论**：
+  - ✅ 搜索 + 分类 AND 过滤逻辑（`useMemo` 缓存）
+  - ✅ 重名追加序号路径正确（已存在则递增）
+  - ✅ TutorialMedia 抽象未改动行为，原页面渲染等价
+  - ⚠️ run.tsx 中相同的 4 套 `if` 链同样可以迁移到 TutorialMedia，本轮未动（保护 v0.3.0 timer 改动稳定性）
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.3.0 · 2026-05-15
 
 - **产品需求**：训练执行流（run.tsx）稳定性与可读性升级；修暂停/继续 timer bug、Slider 误触发结束、加全局进度条；统一文案 + 打卡时长上下限守卫。

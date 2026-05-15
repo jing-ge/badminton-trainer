@@ -62,11 +62,20 @@ export default function PlanListScreen() {
   }
 
   async function onCreate() {
-    if (!newName.trim()) {
+    const trimmed = newName.trim();
+    if (!trimmed) {
       Alert.alert('请输入计划名');
       return;
     }
-    const p = await createBlankPlan(newName.trim(), newMode);
+    // 重名自动追加 (2)/(3)...
+    const existing = new Set(userPlans.map((p) => p.name));
+    let finalName = trimmed;
+    if (existing.has(finalName)) {
+      let i = 2;
+      while (existing.has(`${trimmed} (${i})`)) i++;
+      finalName = `${trimmed} (${i})`;
+    }
+    const p = await createBlankPlan(finalName, newMode);
     await setActivePlanId(p.id);
     setCreating(false);
     setNewName('我的训练计划');
@@ -78,21 +87,26 @@ export default function PlanListScreen() {
       <Text style={styles.title}>训练计划</Text>
       <Text style={styles.sub}>选一个作为当前计划，或者新建自己的</Text>
 
-      {userPlans.length > 0 && (
-        <>
-          <Text style={styles.sectionHeader}>我的计划（{userPlans.length}）</Text>
-          {userPlans.map((p) => (
-            <PlanCard
-              key={p.id}
-              plan={p}
-              isActive={activeId === p.id}
-              onActivate={() => activate(p.id)}
-              onEdit={() => router.push(`/plans/${p.id}/edit`)}
-              onDuplicate={() => onDuplicate(p)}
-              onDelete={() => onDelete(p)}
-            />
-          ))}
-        </>
+      <Text style={styles.sectionHeader}>我的计划（{userPlans.length}）</Text>
+      {userPlans.length > 0 ? (
+        userPlans.map((p) => (
+          <PlanCard
+            key={p.id}
+            plan={p}
+            isActive={activeId === p.id}
+            onActivate={() => activate(p.id)}
+            onEdit={() => router.push(`/plans/${p.id}/edit`)}
+            onDuplicate={() => onDuplicate(p)}
+            onDelete={() => onDelete(p)}
+          />
+        ))
+      ) : (
+        <Card style={{ marginTop: spacing.sm, borderStyle: 'dashed', borderColor: colors.border }}>
+          <Text style={{ color: colors.text, fontWeight: '600', fontSize: font.body }}>✨ 还没有自定义计划</Text>
+          <Text style={{ color: colors.textDim, fontSize: font.small, marginTop: 4 }}>
+            从下方"推荐模板"复制一份,或点底部「+ 空白新建计划」开始定制属于你的训练
+          </Text>
+        </Card>
       )}
 
       <Text style={styles.sectionHeader}>推荐模板</Text>
@@ -209,8 +223,9 @@ function PlanCard({
             <Text style={styles.actText}>✏️ 编辑</Text>
           </Pressable>
         )}
+        {onDelete && <View style={{ flex: 1 }} />}
         {onDelete && (
-          <Pressable onPress={onDelete} style={styles.actBtn}>
+          <Pressable onPress={onDelete} hitSlop={8} style={[styles.actBtn, styles.dangerBtn]}>
             <Text style={[styles.actText, { color: colors.danger }]}>🗑 删除</Text>
           </Pressable>
         )}
@@ -238,8 +253,9 @@ const styles = StyleSheet.create({
   cardHead: { flexDirection: 'row' },
   planName: { color: colors.text, fontSize: font.h3, fontWeight: '700' },
   planMeta: { color: colors.textDim, fontSize: font.small, marginTop: 4 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
   actBtn: { paddingVertical: 6 },
+  dangerBtn: { paddingLeft: spacing.md, borderLeftWidth: 1, borderLeftColor: colors.border },
   actText: { color: colors.text, fontWeight: '600', fontSize: font.small },
   label: { color: colors.textDim, fontSize: font.small },
   input: {

@@ -5,10 +5,7 @@ import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { colors, font, spacing } from '@/theme/tokens';
 import { findTutorial } from '@/data/tutorials';
-import { FootworkAnimation } from '@/components/animations/FootworkAnimation';
-import { ShuttlecockAnimation } from '@/components/animations/ShuttlecockAnimation';
-import { FitnessAnimation } from '@/components/animations/FitnessAnimation';
-import { TacticsAnimation } from '@/components/animations/TacticsAnimation';
+import { TutorialMedia } from '@/components/animations/TutorialMedia';
 import { GripGuide } from '@/components/animations/GripGuide';
 
 export default function TutorialDetail() {
@@ -31,26 +28,12 @@ export default function TutorialDetail() {
         {t.category} · {t.level}
       </Text>
 
-      {t.animationType?.startsWith('footwork') && (
-        <View style={styles.videoContainer}>
-          <FootworkAnimation type={t.animationType} />
-        </View>
-      )}
-      {t.animationType?.startsWith('shuttle') && (
-        <View style={styles.videoContainer}>
-          <ShuttlecockAnimation type={t.animationType} />
-        </View>
-      )}
-      {t.animationType?.startsWith('fitness') && (
-        <View style={styles.videoContainer}>
-          <FitnessAnimation type={t.animationType} name={t.title} />
-        </View>
-      )}
-      {t.animationType?.startsWith('tactics') && (
-        <View style={styles.videoContainer}>
-          <TacticsAnimation />
-        </View>
-      )}
+      <TutorialMedia
+        animationType={t.animationType}
+        name={t.title}
+        height={320}
+        style={{ marginTop: spacing.md }}
+      />
       {t.videoUri ? (
         <View style={styles.videoContainer}>
           <Video
@@ -104,7 +87,7 @@ export default function TutorialDetail() {
       </Card>
 
       <Pressable
-        onPress={() => router.push('/pose')}
+        onPress={() => router.push({ pathname: '/pose', params: { tutorial: t.id } })}
         style={({ pressed }) => [
           styles.cta,
           { opacity: pressed ? 0.8 : 1 },
