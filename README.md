@@ -109,6 +109,21 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.11.0 · 2026-05-15
+
+- **产品需求**：run.tsx idle 状态选择页打磨——状态记忆 + 实时换算 + 私教问诊感。
+- **开发改动**：
+  - `app/training/run.tsx`：引入 `AsyncStorage` 进行 `prefs.lastCondition` 状态持久化记忆。
+  - `app/training/run.tsx`：新增首屏渲染时获取最新一条训练日志（`listTrainingLogs(1)`），计算距今训练天数并在顶部动态渲染 "承接横幅 (Recent Banner)"。
+  - `app/training/run.tsx`：状态选择（满血/一般/疲惫）新增精细反馈动画：副标题触发 opacity 闪动，当前选中卡片触发 scale 轻微放大缩回，并伴随按压震动 `vibrateLight`。实时通过 `Math.round` 换算预计总耗时。
+- **测试结论**：
+  - ✅ AsyncStorage 合法读取与无声异常静默通过，`pickCondition` fire-and-forget 保存。
+  - ✅ 副标题三档文案及其实时预计分钟数显示准确（公式运算未破坏历史标准）。
+  - ✅ Opacity 闪动及卡片 Scale 动画只在当前选中项中生效，且无循环不污染其他动画。
+  - ✅ 承接横幅基于 0 天 / 1-6 天 / >=7 天分支判断准确。
+  - ✅ 无相关状态受牵连，`transitioning`、`finished`、`running` 等阶段完全冻结。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.10.0 · 2026-05-15
 
 - **产品需求**：训练 run 页项间「Next Up + 深呼吸」过渡态 + Running 期 NextBox 信息密度补齐。

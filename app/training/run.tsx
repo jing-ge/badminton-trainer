@@ -6,6 +6,7 @@ import { Audio, Video, ResizeMode } from 'expo-av';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Screen } from '@/components/Screen';
 import { vibrateLight, vibrateMedium, vibrateSuccess, vibrateHeavy } from '@/utils/haptics';
 import { colors, font, radius, spacing } from '@/theme/tokens';
@@ -87,6 +88,11 @@ export default function TrainingRunScreen() {
   const [streakPreview, setStreakPreview] = useState<number | null>(null);
   const badgeAnim = useRef(new Animated.Value(0)).current; // 0→1 用于 scale+opacity
 
+  // idle 态：副标题闪动 + 选中卡片缩放反馈 + 上次训练承接横幅
+  const subtitleAnim = useRef(new Animated.Value(1)).current;
+  const conditionCardAnim = useRef(new Animated.Value(1)).current;
+  const [recentBanner, setRecentBanner] = useState<string | null>(null);
+
   // 背景音乐和音效引用
   const bgmSoundRef = useRef<Audio.Sound | null>(null);
   const sfxHitRef = useRef<Audio.Sound | null>(null);
@@ -165,6 +171,69 @@ export default function TrainingRunScreen() {
       s.pauseAsync().catch(() => {});
     }
   }, [status]);
+
+  // idle 态挂载：恢复上次身体状态选择（"被记起来了"彩蛋）
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const v = await AsyncStorage.getItem('prefs.lastCondition');
+        if (cancelled || !v) return;
+        const num = parseFloat(v);
+        if (num === 1.0 || num === 0.75 || num === 0.5) {
+          setConditionScale(num);
+          vibrateLight();
+        }
+      } catch {
+        // 读取失败 → 保持默认 1.0,静默
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // idle 态挂载：拉一次最近一次训练日志,生成承接横幅文案
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const recent = await listTrainingLogs(1);
+        if (cancelled || recent.length === 0) return;
+        const last = recent[0];
+        const diffDays = dayjs().startOf('day').diff(dayjs(last.date).startOf('day'), 'day');
+        if (diffDays === 0) {
+          setRecentBanner(`今天已练过 ${last.duration_min} 分钟，再来一组？`);
+        } else if (diffDays >= 1 && diffDays <= 6) {
+          setRecentBanner(`距上次训练 ${diffDays} 天，状态调好再开始`);
+        }
+        // ≥7 天 / 无记录 → 不渲染(setRecentBanner 保持 null)
+      } catch {
+        // 拉取失败 → 不渲染,静默
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 切换身体状态：保存 + 副标题闪动 + 选中卡片缩放反馈
+  function pickCondition(scale: number) {
+    setConditionScale(scale);
+    vibrateLight();
+    AsyncStorage.setItem('prefs.lastCondition', String(scale)).catch((e) => {
+      console.warn('save lastCondition failed', e);
+    });
+    // 副标题 opacity 闪动 0.4→1.0
+    subtitleAnim.setValue(0.4);
+    Animated.timing(subtitleAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+    // 选中卡片 scale 反馈 1.0→1.08→1.0,共 220ms
+    conditionCardAnim.setValue(1);
+    Animated.sequence([
+      Animated.timing(conditionCardAnim, { toValue: 1.08, duration: 110, useNativeDriver: true }),
+      Animated.timing(conditionCardAnim, { toValue: 1, duration: 110, useNativeDriver: true }),
+    ]).start();
+  }
 
   useEffect(() => {
     (async () => {
@@ -520,6 +589,22 @@ export default function TrainingRunScreen() {
   }
 
   if (status === 'idle') {
+    const scaledTotalMin = items.reduce(
+      (a, it) => a + Math.max(1, Math.round(it.duration_min * conditionScale)),
+      0,
+    );
+    const scaledSubtitle =
+      conditionScale === 1.0
+        ? `🔋 满血模式 · 预计 ${scaledTotalMin} 分钟完成`
+        : conditionScale === 0.75
+          ? `⚡ 让步 25% · 预计 ${scaledTotalMin} 分钟完成`
+          : `🌙 半负荷 · 预计 ${scaledTotalMin} 分钟完成`;
+    const startBtnSub =
+      conditionScale === 1.0
+        ? '（按 100% 强度执行）'
+        : conditionScale === 0.75
+          ? '（按 75% 强度执行）'
+          : '（按 50% 强度执行）';
     return (
       <View style={{ flex: 1 }}>
         <Screen scroll={false} transparent={true}>
@@ -532,33 +617,44 @@ export default function TrainingRunScreen() {
           </View>
           <View style={styles.centerWrap}>
             <Text style={{ fontSize: 60, marginBottom: spacing.md }}>🏸</Text>
+            {recentBanner && <Text style={styles.recentBanner}>{recentBanner}</Text>}
             <Text style={styles.title}>本次训练共 {items.length} 项</Text>
             <Text style={styles.meta}>原定需要 {totalMin} 分钟</Text>
+            <Animated.Text style={[styles.scaledTimeText, { opacity: subtitleAnim }]}>
+              {scaledSubtitle}
+            </Animated.Text>
 
             {/* 增加今天状态的调查问卷 */}
             <View style={{ marginTop: spacing.xl, width: '100%', paddingHorizontal: spacing.xl }}>
               <Text style={{ color: colors.text, textAlign: 'center', marginBottom: spacing.md, fontWeight: '600' }}>今天感觉怎么样？</Text>
               <View style={{ flexDirection: 'row', gap: spacing.md }}>
-                <Pressable onPress={() => { setConditionScale(1.0); vibrateLight(); }} style={[styles.conditionBtn, conditionScale === 1.0 && styles.conditionBtnActive]}>
-                  <Text style={{ fontSize: 28 }}>🔋</Text>
-                  <Text style={[styles.conditionText, conditionScale === 1.0 && { color: colors.primary }]}>满血</Text>
-                  <Text style={styles.conditionDesc}>100% 负荷</Text>
-                </Pressable>
-                <Pressable onPress={() => { setConditionScale(0.75); vibrateLight(); }} style={[styles.conditionBtn, conditionScale === 0.75 && styles.conditionBtnActive]}>
-                  <Text style={{ fontSize: 28 }}>🔋</Text>
-                  <Text style={[styles.conditionText, conditionScale === 0.75 && { color: colors.primary }]}>一般</Text>
-                  <Text style={styles.conditionDesc}>75% 负荷</Text>
-                </Pressable>
-                <Pressable onPress={() => { setConditionScale(0.5); vibrateLight(); }} style={[styles.conditionBtn, conditionScale === 0.5 && styles.conditionBtnActive]}>
-                  <Text style={{ fontSize: 28 }}>🪫</Text>
-                  <Text style={[styles.conditionText, conditionScale === 0.5 && { color: colors.primary }]}>疲惫</Text>
-                  <Text style={styles.conditionDesc}>50% 负荷</Text>
-                </Pressable>
+                <Animated.View style={{ flex: 1, transform: [{ scale: conditionScale === 1.0 ? conditionCardAnim : 1 }] }}>
+                  <Pressable onPress={() => pickCondition(1.0)} style={[styles.conditionBtn, conditionScale === 1.0 && styles.conditionBtnActive]}>
+                    <Text style={{ fontSize: 28 }}>💪</Text>
+                    <Text style={[styles.conditionText, conditionScale === 1.0 && { color: colors.primary }]}>满血</Text>
+                    <Text style={styles.conditionDesc}>100% 负荷</Text>
+                  </Pressable>
+                </Animated.View>
+                <Animated.View style={{ flex: 1, transform: [{ scale: conditionScale === 0.75 ? conditionCardAnim : 1 }] }}>
+                  <Pressable onPress={() => pickCondition(0.75)} style={[styles.conditionBtn, conditionScale === 0.75 && styles.conditionBtnActive]}>
+                    <Text style={{ fontSize: 28 }}>⚡</Text>
+                    <Text style={[styles.conditionText, conditionScale === 0.75 && { color: colors.primary }]}>一般</Text>
+                    <Text style={styles.conditionDesc}>75% 负荷</Text>
+                  </Pressable>
+                </Animated.View>
+                <Animated.View style={{ flex: 1, transform: [{ scale: conditionScale === 0.5 ? conditionCardAnim : 1 }] }}>
+                  <Pressable onPress={() => pickCondition(0.5)} style={[styles.conditionBtn, conditionScale === 0.5 && styles.conditionBtnActive]}>
+                    <Text style={{ fontSize: 28 }}>🪫</Text>
+                    <Text style={[styles.conditionText, conditionScale === 0.5 && { color: colors.primary }]}>疲惫</Text>
+                    <Text style={styles.conditionDesc}>50% 负荷</Text>
+                  </Pressable>
+                </Animated.View>
               </View>
             </View>
 
             <Pressable style={styles.startBtnBig} onPress={startWorkout}>
               <Text style={styles.startBtnBigText}>▶ 开始跟练</Text>
+              <Text style={styles.startBtnSubText}>{startBtnSub}</Text>
             </Pressable>
           </View>
         </Screen>
@@ -956,5 +1052,8 @@ const styles = StyleSheet.create({
   finishedQuote: { color: colors.text, fontSize: font.body, marginTop: spacing.lg, textAlign: 'center', paddingHorizontal: spacing.lg },
   streakPreview: { color: colors.primary, fontSize: font.small, marginTop: spacing.sm, fontWeight: '600' },
   restartLink: { color: colors.textDim, fontSize: font.body, fontWeight: '600' },
+  recentBanner: { color: colors.textDim, fontSize: font.tiny, marginBottom: spacing.sm, textAlign: 'center' },
+  scaledTimeText: { color: colors.primary, fontSize: font.small, marginTop: spacing.sm, fontWeight: '600', textAlign: 'center' },
+  startBtnSubText: { color: 'rgba(255,255,255,0.7)', fontSize: font.tiny, marginTop: 4, textAlign: 'center' },
 });
 
