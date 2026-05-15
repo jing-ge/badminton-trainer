@@ -109,6 +109,21 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.14.0 · 2026-05-15
+
+- **产品需求**：stats 顶部「时间舱」——周/月切换 + 同比箭头 + 数字滚动动画。
+- **开发改动**：
+  - `app/(tabs)/stats.tsx`：引入新的 `PeriodMode` 与双侧期段计算逻辑（支持天数、时长和强度），增加顶部 PeriodBar (本周/本月) 及 `streak` 小字降级展示。
+  - `app/(tabs)/stats.tsx`：重写了核心 KPI 组件为 `PeriodKPI`，内部支持对比期数据换算、极简趋势图标渲染（`▲`/`▼`）。
+  - `app/(tabs)/stats.tsx`：基于 `reanimated` 的 `Animated.createAnimatedComponent(TextInput)` 封装了高性能跳数动画 `AnimatedNumber`，在 UI 线程直接驱动动画文本改变，避开了 `setState` / `setInterval` 引起的 JS 线程拥堵。
+- **测试结论**：
+  - ✅ 时间计算无误：利用 `dayjs().day()` 针对周一起点进行妥善边界处理，上一期与当期的比较数据能精准隔离提取；当数据空载时，正确回退到 `—` 以及 "本周/本月尚未打卡" 的兜底描述。
+  - ✅ 交互与动画流畅：左侧切换 Pill 完全复用了 Library 分类的视觉并支持 `vibrateLight` 触觉反馈；`AnimatedNumber` 通过 Shared Value 能平滑流转 (400ms) 并且没有诱发异常副作用震动与死循环。
+  - ✅ 格式化同步：`formatDurationLabel` 被完美拆分复用，强度同步保持了 `toFixed(1)` 的一位小数计算输出。
+  - ✅ 组件稳定性：A:C Ratio 预警卡、分布横条图、热力图、历史记录均未发生雪崩，保留了所有样式表现。
+  - ✅ 无相关外部环境污染及多余 NPM 引入。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.13.0 · 2026-05-15
 
 - **产品需求**：「我的」Tab 从设置列表升级为「私教档案卡 + 成就墙」。

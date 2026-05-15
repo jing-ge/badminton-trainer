@@ -1,22 +1,77 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { useAnimatedProps, useSharedValue, withTiming, Easing } from 'react-native-reanimated';
 import dayjs from 'dayjs';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Section } from '@/components/Section';
-import { colors, font, spacing } from '@/theme/tokens';
+import { colors, font, radius, spacing } from '@/theme/tokens';
 import {
   getStreak,
   listTrainingLogs,
   TrainingLog,
 } from '@/db/trainingLogs';
+import { vibrateLight } from '@/utils/haptics';
+
+type PeriodMode = 'week' | 'month';
+
+// reanimated 数字滚动:在 UI 线程把 SharedValue 写进 TextInput.text 属性,
+// 避免 setState 高频 re-render。editable=false + pointerEvents='none' 让它看上去像文本。
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 const HISTORY_INITIAL = 20;
+
+// 主数值与上一期对比公式不分大类卡片;复用给"累计时长"格式化(分钟 -> 字符串)
+function formatDurationLabel(mins: number): string {
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h < 10 && m >= 30) return `${h}.5h`;
+  return `${h}h`;
+}
+
+// 周/月区间(YYYY-MM-DD 字符串闭区间)
+function getPeriodRange(mode: PeriodMode): { curStart: string; curEnd: string; prevStart: string; prevEnd: string; prevLabel: string } {
+  const today = dayjs();
+  const todayStr = today.format('YYYY-MM-DD');
+  if (mode === 'week') {
+    // dayjs().day():0=周日,1=周一,...6=周六。需修正到周一起点
+    const d = today.day();
+    const diffFromMonday = d === 0 ? 6 : d - 1;
+    const curStart = today.subtract(diffFromMonday, 'day').format('YYYY-MM-DD');
+    const prevStart = today.subtract(diffFromMonday + 7, 'day').format('YYYY-MM-DD');
+    const prevEnd = today.subtract(diffFromMonday + 1, 'day').format('YYYY-MM-DD');
+    return { curStart, curEnd: todayStr, prevStart, prevEnd, prevLabel: '上周' };
+  }
+  // month
+  const curStart = today.startOf('month').format('YYYY-MM-DD');
+  const prevMonth = today.subtract(1, 'month');
+  const prevStart = prevMonth.startOf('month').format('YYYY-MM-DD');
+  const prevEnd = prevMonth.endOf('month').format('YYYY-MM-DD');
+  return { curStart, curEnd: todayStr, prevStart, prevEnd, prevLabel: '上月' };
+}
+
+type PeriodStat = {
+  days: number;
+  mins: number;
+  avgIntensity: number;
+  hasData: boolean;
+};
+
+function summarizePeriod(logs: TrainingLog[], start: string, end: string): PeriodStat {
+  const inRange = logs.filter((l) => l.date >= start && l.date <= end);
+  if (inRange.length === 0) return { days: 0, mins: 0, avgIntensity: 0, hasData: false };
+  const days = new Set(inRange.map((l) => l.date)).size;
+  const mins = inRange.reduce((a, b) => a + b.duration_min, 0);
+  const avgIntensity = inRange.reduce((a, b) => a + b.intensity, 0) / inRange.length;
+  return { days, mins, avgIntensity, hasData: true };
+}
 
 export default function StatsScreen() {
   const [streak, setStreak] = useState(0);
   const [logs, setLogs] = useState<TrainingLog[]>([]);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('week');
 
   useEffect(() => {
     (async () => {
@@ -25,17 +80,13 @@ export default function StatsScreen() {
     })();
   }, []);
 
-  const trainedDays = new Set(logs.map(l => l.date)).size;
-  const totalMins = logs.reduce((a, b) => a + b.duration_min, 0);
-
-  // 累计时长 KPI:< 60 分钟显示 m,>= 60 分钟显示 h(可带半精度);避免新用户看到 0h
-  const totalDurationLabel = useMemo(() => {
-    if (totalMins < 60) return `${totalMins}m`;
-    const h = Math.floor(totalMins / 60);
-    const m = totalMins % 60;
-    if (h < 10 && m >= 30) return `${h}.5h`;
-    return `${h}h`;
-  }, [totalMins]);
+  // 时间舱:周/月当期 + 上一期统计
+  const periodStats = useMemo(() => {
+    const range = getPeriodRange(periodMode);
+    const cur = summarizePeriod(logs, range.curStart, range.curEnd);
+    const prev = summarizePeriod(logs, range.prevStart, range.prevEnd);
+    return { ...range, cur, prev };
+  }, [logs, periodMode]);
 
   // 计算热力图数据 (最近 90 天)
   const heatmapDays = 90;
@@ -100,10 +151,63 @@ export default function StatsScreen() {
     <Screen>
       <Text style={styles.title}>训练记录</Text>
 
+      {/* P0-1: 时间舱(周/月切换) + 连续天数 inline */}
+      <View style={styles.periodBar}>
+        <View style={styles.periodPills}>
+          {(['week', 'month'] as const).map((m) => {
+            const active = periodMode === m;
+            return (
+              <Pressable
+                key={m}
+                onPress={() => {
+                  if (periodMode === m) return;
+                  vibrateLight();
+                  setPeriodMode(m);
+                }}
+                style={[
+                  styles.periodPill,
+                  active && { backgroundColor: colors.primary, borderColor: colors.primary },
+                ]}
+              >
+                <Text style={{ color: active ? '#fff' : colors.textDim, fontWeight: '600', fontSize: font.small }}>
+                  {m === 'week' ? '本周' : '本月'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.streakInline}>🔥 连续 {streak} 天</Text>
+      </View>
+
       <View style={styles.kpiRow}>
-        <KPI value={`${streak}`} label="🔥 连续天数" />
-        <KPI value={`${trainedDays}`} label="累计打卡(天)" />
-        <KPI value={totalDurationLabel} label="累计时长" />
+        <PeriodKPI
+          label="打卡天数"
+          unit="天"
+          current={periodStats.cur.hasData ? periodStats.cur.days : null}
+          previous={periodStats.prev.hasData ? periodStats.prev.days : null}
+          prevLabel={periodStats.prevLabel}
+          mode={periodMode}
+          format={(v) => `${Math.round(v)}`}
+        />
+        <PeriodKPI
+          label="累计时长"
+          current={periodStats.cur.hasData ? periodStats.cur.mins : null}
+          previous={periodStats.prev.hasData ? periodStats.prev.mins : null}
+          prevLabel={periodStats.prevLabel}
+          mode={periodMode}
+          format={(v) => formatDurationLabel(Math.round(v))}
+          // 时长用整数比较(分钟)
+        />
+        <PeriodKPI
+          label="平均强度"
+          prefix="★ "
+          current={periodStats.cur.hasData ? periodStats.cur.avgIntensity : null}
+          previous={periodStats.prev.hasData ? periodStats.prev.avgIntensity : null}
+          prevLabel={periodStats.prevLabel}
+          mode={periodMode}
+          format={(v) => v.toFixed(1)}
+          decimals={1}
+        />
       </View>
 
       <Card style={{ marginBottom: spacing.lg, borderColor: isHighRisk ? colors.danger : colors.border }}>
@@ -239,21 +343,148 @@ export default function StatsScreen() {
   );
 }
 
-function KPI({ value, label }: { value: string; label: string }) {
+function PeriodKPI({
+  label,
+  prefix,
+  unit,
+  current,
+  previous,
+  prevLabel,
+  mode,
+  format,
+  decimals = 0,
+}: {
+  label: string;
+  prefix?: string;
+  unit?: string;
+  /** null = 当期无数据 */
+  current: number | null;
+  /** null = 上一期无记录 */
+  previous: number | null;
+  prevLabel: string;
+  mode: PeriodMode;
+  format: (v: number) => string;
+  decimals?: number;
+}) {
+  const hasCurrent = current !== null;
+
+  // 同比箭头:仅在 prev 有效且非零、且 current 不等 prev 时显示
+  let trend: 'up' | 'down' | null = null;
+  if (hasCurrent && previous !== null && previous > 0) {
+    if (current! > previous) trend = 'up';
+    else if (current! < previous) trend = 'down';
+  }
+
+  // 副行
+  let subline: string;
+  if (previous === null) {
+    subline = mode === 'week' ? '上周无记录' : '上月无记录';
+  } else {
+    subline = `${prevLabel} ${format(previous)}${unit ?? ''}`;
+  }
+  if (!hasCurrent) {
+    subline = mode === 'week' ? '本周尚未打卡' : '本月尚未打卡';
+  }
+
   return (
     <Card style={styles.kpi}>
-      <Text style={styles.kpiValue}>{value}</Text>
+      <View style={styles.kpiValueRow}>
+        {hasCurrent ? (
+          <AnimatedNumber
+            value={current!}
+            format={format}
+            prefix={prefix}
+            decimals={decimals}
+            style={styles.kpiValue}
+          />
+        ) : (
+          <Text style={[styles.kpiValue, { color: colors.textDim }]}>—</Text>
+        )}
+        {hasCurrent && unit ? <Text style={styles.kpiUnit}>{unit}</Text> : null}
+        {trend && (
+          <Text
+            style={[
+              styles.kpiTrend,
+              { color: trend === 'up' ? colors.primary : colors.danger },
+            ]}
+          >
+            {trend === 'up' ? '▲' : '▼'}
+          </Text>
+        )}
+      </View>
       <Text style={styles.kpiLabel}>{label}</Text>
+      <Text style={styles.kpiSub}>{subline}</Text>
     </Card>
+  );
+}
+
+/**
+ * 主数值跳数动画:reanimated SharedValue 走 withTiming 400ms,
+ * UI 线程把 .text 写进 AnimatedTextInput,避免 setState 高频 re-render。
+ */
+function AnimatedNumber({
+  value,
+  format,
+  prefix,
+  decimals,
+  style,
+}: {
+  value: number;
+  format: (v: number) => string;
+  prefix?: string;
+  decimals: number;
+  style: object;
+}) {
+  const sv = useSharedValue(value);
+  useEffect(() => {
+    sv.value = withTiming(value, { duration: 400, easing: Easing.out(Easing.cubic) });
+    // 仅 value 变化时触发;sv 引用稳定,无需进 deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const animatedProps = useAnimatedProps(() => {
+    const v = decimals > 0 ? sv.value : Math.round(sv.value);
+    return { text: `${prefix ?? ''}${format(v)}`, defaultValue: `${prefix ?? ''}${format(v)}` } as Partial<{ text: string; defaultValue: string }>;
+  });
+
+  return (
+    <AnimatedTextInput
+      editable={false}
+      // 关闭可交互,使其在视觉上等同于 <Text>
+      underlineColorAndroid="transparent"
+      value={undefined}
+      defaultValue={`${prefix ?? ''}${format(decimals > 0 ? value : Math.round(value))}`}
+      style={[styles.kpiValueInput, style]}
+      animatedProps={animatedProps}
+    />
   );
 }
 
 const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: font.h1, fontWeight: '700', marginBottom: spacing.lg },
+  // 时间舱:Pill 切换条 + 右侧 streak 小字
+  periodBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+  periodPills: { flexDirection: 'row', gap: spacing.sm },
+  periodPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  streakInline: { color: colors.warn, fontSize: font.small, fontWeight: '600' },
   kpiRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   kpi: { flex: 1, alignItems: 'center', padding: spacing.md },
   kpiValue: { color: colors.text, fontSize: font.h2, fontWeight: '800' },
+  // 主数值 + 单位 + 三角 同一行
+  kpiValueRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  // AnimatedTextInput 默认有 padding,需要清零让它视觉对齐 <Text>
+  kpiValueInput: { padding: 0, margin: 0, textAlign: 'center', minWidth: 32 },
+  kpiUnit: { color: colors.textDim, fontSize: font.small, marginLeft: 1 },
+  // 三角箭头:12px,主数值右侧
+  kpiTrend: { fontSize: 12, marginLeft: 4, fontWeight: '700' },
   kpiLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
+  kpiSub: { color: colors.textDim, fontSize: font.tiny, marginTop: 2, opacity: 0.85 },
   empty: { color: colors.textDim, textAlign: 'center', paddingVertical: spacing.lg },
   logRow: { flexDirection: 'row', alignItems: 'center' },
   logDate: { color: colors.text, fontWeight: '600' },
