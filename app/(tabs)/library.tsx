@@ -1,17 +1,50 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import dayjs from 'dayjs';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { colors, font, radius, spacing } from '@/theme/tokens';
-import { tutorials, Tutorial } from '@/data/tutorials';
+import { tutorials, Tutorial, findTutorial } from '@/data/tutorials';
+import { listFavoriteIds, listRecentViews } from '@/db/tutorials';
+import { TutorialStrip, TutorialWithBadge } from '@/features/library/TutorialStrip';
 
 const CATEGORIES = ['全部', '后场', '前场', '步法', '发球', '战术'] as const;
+
+function humanizeAgo(viewedAt: number): string {
+  const days = dayjs().startOf('day').diff(dayjs(viewedAt).startOf('day'), 'day');
+  if (days <= 0) return '今天';
+  if (days === 1) return '昨天';
+  if (days < 7) return `${days} 天前`;
+  return dayjs(viewedAt).format('M/D');
+}
 
 export default function LibraryScreen() {
   const router = useRouter();
   const [cat, setCat] = useState<(typeof CATEGORIES)[number]>('全部');
   const [query, setQuery] = useState('');
+  const [favorites, setFavorites] = useState<TutorialWithBadge[]>([]);
+  const [recents, setRecents] = useState<TutorialWithBadge[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const favIds = await listFavoriteIds();
+        const favs = favIds
+          .map((id) => findTutorial(id))
+          .filter((t): t is Tutorial => Boolean(t));
+        setFavorites(favs);
+
+        const views = await listRecentViews(6);
+        const recs: TutorialWithBadge[] = [];
+        for (const v of views) {
+          const t = findTutorial(v.id);
+          if (t) recs.push({ ...t, badge: humanizeAgo(v.viewedAt) });
+        }
+        setRecents(recs);
+      })();
+    }, []),
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -28,6 +61,9 @@ export default function LibraryScreen() {
     <Screen>
       <Text style={styles.title}>技术动作教程</Text>
       <Text style={styles.sub}>共 {tutorials.length} 个要点 · 业余中级适用</Text>
+
+      <TutorialStrip title="⭐ 我的收藏" items={favorites} />
+      <TutorialStrip title="⏱ 最近浏览" items={recents} />
 
       <View style={styles.searchBox}>
         <Text style={styles.searchIcon}>🔍</Text>

@@ -109,6 +109,23 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.12.0 · 2026-05-15
+
+- **产品需求**：教程模块从「字典」走向「私教手册」——收藏 + 自动浏览埋点 + Library 顶部双横滑带。
+- **开发改动**：
+  - `src/db/index.ts`：增加 `tutorial_favorites` 与 `tutorial_views` 的两张 DB 表及配套的重置时 DROP。
+  - `src/db/tutorials.ts`：新增完整的异步、静默收藏及埋点记录 API。
+  - `app/tutorial/[id].tsx`：重构标题区为 `row`，并在右侧集成收藏星标按钮。挂载自动向 DB 追加浏览历史。
+  - `app/(tabs)/library.tsx` 和 `src/features/library/TutorialStrip.tsx`：实现并在顶部植入「⭐ 我的收藏」+「⏱ 最近浏览」横向带组件。
+- **测试结论**：
+  - ✅ DB migrate 和 reset 行为完备对齐；教程 DB 函数内部包裹 `try/catch`，实现静默降级不阻断。
+  - ✅ 星标按钮在 `loaded` 前隐藏 (`opacity: 0`)，防范突变。收藏时交互包含 `scale` 轻动画与震级触感反馈（`vibrateMedium`/`vibrateLight`）。
+  - ✅ 横滑带按预期从无数据时的防渲染空洞，至有数据时的类别表情与 `humanizeAgo` 时间角标展示一切正常。
+  - ✅ 未引入新 npm 包，原有平铺列表、其它功能 Tab 与配置文件安全锁定。
+- **挂账记录**：
+  - ⚠️ `resetDB` 在之前迭代中遗漏了 `DROP TABLE IF EXISTS user_plans;`，由 @developer 标记并在后续跟进。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.11.0 · 2026-05-15
 
 - **产品需求**：run.tsx idle 状态选择页打磨——状态记忆 + 实时换算 + 私教问诊感。

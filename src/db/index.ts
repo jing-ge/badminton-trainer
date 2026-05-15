@@ -76,6 +76,16 @@ async function migrate(db: DBHandle) {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS tutorial_favorites (
+      tutorial_id TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tutorial_views (
+      tutorial_id TEXT PRIMARY KEY,
+      viewed_at INTEGER NOT NULL
+    );
   `);
 }
 
@@ -86,6 +96,8 @@ export async function resetDB() {
     DROP TABLE IF EXISTS pose_sessions;
     DROP TABLE IF EXISTS replay_clips;
     DROP TABLE IF EXISTS schedules;
+    DROP TABLE IF EXISTS tutorial_favorites;
+    DROP TABLE IF EXISTS tutorial_views;
   `);
   _db = null;
   await getDB();
