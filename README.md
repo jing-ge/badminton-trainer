@@ -109,6 +109,21 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.13.0 · 2026-05-15
+
+- **产品需求**：「我的」Tab 从设置列表升级为「私教档案卡 + 成就墙」。
+- **开发改动**：
+  - `app/(tabs)/me.tsx`：整页重构。顶部新增私教档案头，支持内联编辑昵称及通过 AsyncStorege 记忆的 3 选 1 级别芯片；中部嵌入了基于 `getStreakStats` / `listTrainingLogs` 演算的三连数据展示卡（包含最长连击、累计训练时长、当前执行计划）；底层固化保留了原有的配置选项列表。
+  - `app.json` & `me.tsx`：提取 `app.json` 的版本号 `Constants.expoConfig?.version` 到全局用于脚标及应用弹窗呈现。
+- **测试结论**：
+  - ✅ AsyncStorage 读写验证：昵称输入安全校验（`maxLength`、`trim()` 回退机制）生效；级别芯片呈现单行或展开式呈现反馈，按压时包含震动。
+  - ✅ dayjs 运算加入天数准确，并在首练为 `null` 时正确回退引导。
+  - ✅ 数据状态（成就卡 A/B/C）渲染逻辑合规：`best = 0` 及 `>0` 状态正常分支呈现；累计训练显示 `Nm`/`Nh` 时间与 `stats` 页复用规则；计划长名称超出一行 `numberOfLines 1` 正确截断；未获取到数据前正常用 3 个骨架屏（无文字仅背景色）平滑占位。
+  - ✅ 未涉及 `run.tsx`、其它业务 Tabs 与环境锁定文件的污染。
+- **挂账记录**：
+  - ⚠️ `resetDB` 在之前迭代中遗漏了 `DROP TABLE IF EXISTS user_plans;`，尚未清理，挂账持续跟进。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.12.0 · 2026-05-15
 
 - **产品需求**：教程模块从「字典」走向「私教手册」——收藏 + 自动浏览埋点 + Library 顶部双横滑带。
