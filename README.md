@@ -109,6 +109,23 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.7.0 · 2026-05-15
+
+- **产品需求**：5 轮迭代收官——回款历史挂账（run.tsx 复用 TutorialMedia、pose fromBar 定位）+ 实用小升级（Tab Bar 激活态、log 快捷时长、清理 dep）。
+- **开发改动**：
+  - `app/(tabs)/_layout.tsx`：emoji 不响应 `color` prop 的老问题——给激活 Tab 在 emoji 下方加一根 18×3 的高亮条（`colors.primary`），让选中态明显可见。
+  - `app/training/log.tsx`：训练时长 input 下方加 `30 / 60 / 90 / 120 分钟` 快捷 chip，常用值一键填，激活态绿色。
+  - `app/training/run.tsx`：清掉 v0.4.0 挂账——4 套 animationType `if` 链替换为单一 `<TutorialMedia>` 调用；移除原本的 4 个动画组件 import，由 TutorialMedia 内部承接。
+  - `app/pose/index.tsx`：fromBar 去掉 `position: absolute`，改为正常 flex 流式，避免与 router header 视觉冲突（v0.5.0 标注）。
+  - `package.json`：`canvas` 是 Node 端 lib（仅 `draw_icon.js` 脚本用），从 `dependencies` 移到 `devDependencies`，减小用户安装体积；版本号 `0.1.0` → `0.7.0` 与 README 迭代日志对齐。
+- **测试结论**：
+  - ✅ Tab Bar 激活底条逻辑（focused 切换 backgroundColor）
+  - ✅ 快捷 chip active 态绑定 `duration === String(n)`
+  - ✅ run.tsx 改造前后行为等价（animationType 仍按 startsWith 在 TutorialMedia 内部分发）
+  - ✅ `canvas` 移到 devDependencies，App 运行时不再装这个无关 lib
+  - ⚠️ `package-lock.json` 这次没重新生成（避免临时网络/缓存问题），后续 `npm install` 时会自动同步
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.6.0 · 2026-05-15
 
 - **产品需求**：stats 页可视化深度（训练类别分布横条图、累计时长单位修复、历史记录展开）+ 计划编辑空态/星期 chip/自动滚动。

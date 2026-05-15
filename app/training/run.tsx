@@ -11,10 +11,7 @@ import { colors, font, radius, spacing } from '@/theme/tokens';
 import { getActivePlan } from '@/db/plans';
 import { selectToday } from '@/data/selectToday';
 import type { TrainingItem, TrainingModule } from '@/data/planTypes';
-import { FootworkAnimation } from '@/components/animations/FootworkAnimation';
-import { ShuttlecockAnimation } from '@/components/animations/ShuttlecockAnimation';
-import { FitnessAnimation } from '@/components/animations/FitnessAnimation';
-import { TacticsAnimation } from '@/components/animations/TacticsAnimation';
+import { TutorialMedia } from '@/components/animations/TutorialMedia';
 
 import { defaultPlans } from '@/data/presets';
 
@@ -587,21 +584,14 @@ export default function TrainingRunScreen() {
         </View>
 
         <View style={styles.mainBox}>
-          {currentItem.animationType?.startsWith('footwork') ? (
+          {currentItem.animationType ? (
             <View style={styles.demoVideoWrap}>
-              <FootworkAnimation type={currentItem.animationType} />
-            </View>
-          ) : currentItem.animationType?.startsWith('shuttle') ? (
-            <View style={styles.demoVideoWrap}>
-              <ShuttlecockAnimation type={currentItem.animationType} />
-            </View>
-          ) : currentItem.animationType?.startsWith('fitness') ? (
-            <View style={styles.demoVideoWrap}>
-              <FitnessAnimation type={currentItem.animationType} name={currentItem.name} />
-            </View>
-          ) : currentItem.animationType?.startsWith('tactics') ? (
-            <View style={styles.demoVideoWrap}>
-              <TacticsAnimation />
+              <TutorialMedia
+                animationType={currentItem.animationType}
+                name={currentItem.name}
+                height={260}
+                style={{ borderRadius: 0, backgroundColor: 'transparent' }}
+              />
             </View>
           ) : currentItem.videoUri ? (
             <View style={styles.demoVideoWrap}>

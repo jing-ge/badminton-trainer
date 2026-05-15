@@ -1,12 +1,22 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 import { colors } from '@/theme/tokens';
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
+  // emoji 自带颜色,无法响应 tintColor;改为 emoji 下方加一根高亮条作为激活态
   return (
-    <Text style={{ fontSize: 18, color: focused ? colors.primary : colors.textDim }}>
-      {label}
-    </Text>
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 18 }}>{label}</Text>
+      <View
+        style={{
+          width: 18,
+          height: 3,
+          marginTop: 4,
+          borderRadius: 2,
+          backgroundColor: focused ? colors.primary : 'transparent',
+        }}
+      />
+    </View>
   );
 }
 

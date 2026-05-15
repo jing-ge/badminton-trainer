@@ -8,6 +8,7 @@ import { colors, font, radius, spacing } from '@/theme/tokens';
 import { insertTrainingLog } from '@/db/trainingLogs';
 
 const ALL_CATS = ['后场', '前场', '步法', '体能', '实战', '发球'];
+const QUICK_MINS = [30, 60, 90, 120];
 
 export default function TrainingLogScreen() {
   const { plan_id, mins } = useLocalSearchParams<{ plan_id?: string; mins?: string }>();
@@ -84,6 +85,20 @@ export default function TrainingLogScreen() {
           placeholder="60"
           placeholderTextColor={colors.textDim}
         />
+        <View style={styles.quickRow}>
+          {QUICK_MINS.map((n) => {
+            const active = duration === String(n);
+            return (
+              <Pressable
+                key={n}
+                onPress={() => setDuration(String(n))}
+                style={[styles.quickChip, active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+              >
+                <Text style={{ color: active ? '#fff' : colors.text, fontSize: font.small, fontWeight: '600' }}>{n} 分钟</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </Card>
 
       <Card style={{ marginTop: spacing.md }}>
@@ -171,6 +186,15 @@ const styles = StyleSheet.create({
   },
   starsRow: { flexDirection: 'row', gap: spacing.md },
   star: { fontSize: 32 },
+  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  quickChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.cardAlt,
+  },
   tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tag: {
     paddingHorizontal: spacing.md,

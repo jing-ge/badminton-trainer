@@ -72,7 +72,7 @@ export default function PoseScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', paddingTop: spacing.xxl },
-  fromBar: { width: '100%', alignItems: 'flex-start', marginBottom: spacing.md, position: 'absolute', top: 0, left: 0, paddingHorizontal: spacing.md, paddingVertical: spacing.md },
+  fromBar: { width: '100%', alignItems: 'flex-start', marginBottom: spacing.md },
   backBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardAlt, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill, gap: 2 },
   backText: { color: colors.text, fontSize: font.small, fontWeight: '600' },
   iconWrap: { width: 140, height: 140, borderRadius: 70, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg, borderWidth: 4, borderColor: colors.primary, shadowColor: colors.primary, shadowOpacity: 0.5, shadowRadius: 20, shadowOffset: { width: 0, height: 0 } },
