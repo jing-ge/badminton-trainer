@@ -60,9 +60,14 @@ export default function StatsScreen() {
   // 急性负荷: 最近 7 天时长总和
   const acuteLoad = heatData.slice(-7).reduce((a, b) => a + b.mins, 0);
   // 慢性负荷: 最近 28 天日均时长 * 7
-  const chronicLoad = heatData.slice(-28).reduce((a, b) => a + b.mins, 0) / 4;
-  const acRatio = chronicLoad > 0 ? (acuteLoad / chronicLoad).toFixed(2) : '0';
-  const isHighRisk = Number(acRatio) > 1.5;
+  const last28 = heatData.slice(-28);
+  const chronicLoad = last28.reduce((a, b) => a + b.mins, 0) / 4;
+  const last28Total = last28.reduce((a, b) => a + b.mins, 0);
+  const last28Days = last28.filter((d) => d.mins > 0).length;
+  // 样本不足：累计 < 60 分钟 或 训练 < 3 天，不做监测（避免新用户被误报"高风险"）
+  const acReady = last28Total >= 60 && last28Days >= 3 && chronicLoad > 0;
+  const acRatio = acReady ? (acuteLoad / chronicLoad).toFixed(2) : '—';
+  const isHighRisk = acReady && Number(acRatio) > 1.5;
 
   return (
     <Screen>
@@ -76,19 +81,27 @@ export default function StatsScreen() {
 
       <Card style={{ marginBottom: spacing.lg, borderColor: isHighRisk ? colors.danger : colors.border }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
+          <View style={{ flex: 1, paddingRight: spacing.md }}>
             <Text style={{ color: colors.text, fontWeight: '700', fontSize: font.h3 }}>运动伤病预警 (A:C 比值)</Text>
             <Text style={{ color: colors.textDim, fontSize: font.small, marginTop: 4 }}>
-              近7天负荷 / 近28天平均负荷 (安全区间 0.8-1.3)
+              {acReady
+                ? '近7天负荷 / 近28天平均负荷 (安全区间 0.8-1.3)'
+                : '数据样本不足，至少累计 3 天 / 60 分钟训练后开始监测'}
             </Text>
           </View>
-          <Text style={{ color: isHighRisk ? colors.danger : colors.primary, fontSize: 32, fontWeight: '800' }}>
+          <Text
+            style={{
+              color: !acReady ? colors.textDim : isHighRisk ? colors.danger : colors.primary,
+              fontSize: 32,
+              fontWeight: '800',
+            }}
+          >
             {acRatio}
           </Text>
         </View>
         {isHighRisk && (
           <Text style={{ color: colors.danger, fontSize: font.small, marginTop: spacing.md }}>
-            ⚠️ 警告：你最近一周的训练量增加过快，拉伤或劳损的风险极高！建议这周加入更多“恢复”项。
+            ⚠️ 警告：你最近一周的训练量增加过快，拉伤或劳损的风险极高！建议这周加入更多"恢复"项。
           </Text>
         )}
       </Card>

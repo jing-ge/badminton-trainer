@@ -99,3 +99,30 @@ npx eas-cli build -p android --profile preview
 
 ## 📄 开源协议 (License)
 本项目采用 [MIT License](LICENSE) 协议进行开源。
+
+---
+
+## 📝 迭代日志
+
+> 每一轮 `产品 → 开发 → 测试` 流水线完成后，由 `@tester` 在此区块顶部追加一条记录（最新在上）。
+> Agent 协作规则详见 [`AGENTS.md`](./AGENTS.md)。
+
+<!-- ITERATION_LOG_START -->
+
+### v0.2.0 · 2026-05-15
+
+- **产品需求**：清理首页与「我的」Tab 的功能错位与跳转盲区，打通新用户首启与空数据态。
+- **开发改动**：
+  - `app/(tabs)/index.tsx`：用 `loaded`/`daysSinceLast === -1` 区分新老用户，新增🎯欢迎卡、修文案"已 N 天没练"；快捷入口由 4 张瘦身为 2 张（动作识别 / 录像复盘）；"切换计划"改为描边 chip + haptics + hitSlop。
+  - `app/(tabs)/me.tsx`：移除与首页/训练 Tab 重复的"动作识别 / 录像复盘 / 体能训练"三项；新增"关于本应用"项；等级文字升级为可点击徽章（占位 Alert）。
+  - `app/(tabs)/stats.tsx`：A:C 比值新增样本守卫——近 28 天累计 < 60 分钟 或训练 < 3 天时显示「—」+ 灰色 + 提示文案，不再误报"高风险"。
+  - `app/(tabs)/train.tsx`：「⇄ 切换」按钮加 `vibrateLight` + `hitSlop`。
+- **测试结论**：
+  - ✅ 5 条 PRD 验收标准全部对齐（详见 PR 描述对照表）
+  - ✅ 文案 grep："很久" 已无残留
+  - ✅ Web 端 haptics 走 `Platform.OS !== 'web'` 守卫，不会报错
+  - ⚠️ 仅静态 walk-through，未跑真机；视觉与触感需在真机回归
+- **typecheck**：✅ `tsc --noEmit` 通过
+
+<!-- ITERATION_LOG_END -->
+

@@ -7,6 +7,7 @@ import { Section } from '@/components/Section';
 import { colors, font, radius, spacing } from '@/theme/tokens';
 import type { Plan, TrainingModule } from '@/data/planTypes';
 import { getActivePlan } from '@/db/plans';
+import { vibrateLight } from '@/utils/haptics';
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -49,8 +50,10 @@ export default function TrainScreen() {
           </Text>
         </View>
         <Pressable
-          style={styles.switchBtn}
+          hitSlop={8}
+          onPressIn={vibrateLight}
           onPress={() => router.push('/plans')}
+          style={({ pressed }) => [styles.switchBtn, { opacity: pressed ? 0.75 : 1 }]}
         >
           <Text style={styles.switchBtnText}>⇄ 切换</Text>
         </Pressable>

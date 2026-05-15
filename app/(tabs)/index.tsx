@@ -10,13 +10,16 @@ import { colors, font, radius, spacing } from '@/theme/tokens';
 import { getStreak, listTrainingLogs, TrainingLog } from '@/db/trainingLogs';
 import { getActivePlan } from '@/db/plans';
 import { selectToday, TodaySelection } from '@/data/selectToday';
+import { vibrateLight } from '@/utils/haptics';
 
 export default function HomeScreen() {
   const router = useRouter();
   const [today, setToday] = useState<TodaySelection | null>(null);
   const [streak, setStreak] = useState(0);
   const [recent, setRecent] = useState<TrainingLog[]>([]);
+  // -1 表示尚未训练过；0+ 表示距离最后一次训练的天数
   const [daysSinceLast, setDaysSinceLast] = useState(0);
+  const [loaded, setLoaded] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -26,13 +29,14 @@ export default function HomeScreen() {
         setStreak(await getStreak());
         const logs = await listTrainingLogs(3);
         setRecent(logs);
-        
+
         if (logs.length > 0) {
           const lastDate = dayjs(logs[0].date);
           setDaysSinceLast(dayjs().diff(lastDate, 'day'));
         } else {
-          setDaysSinceLast(999);
+          setDaysSinceLast(-1);
         }
+        setLoaded(true);
       })();
     }, []),
   );
@@ -58,8 +62,10 @@ export default function HomeScreen() {
             <Text style={styles.streakLabel}>连续训练天数</Text>
           </View>
           <Pressable
-            style={styles.checkin}
+            hitSlop={8}
+            onPressIn={vibrateLight}
             onPress={() => router.push('/training/log')}
+            style={({ pressed }) => [styles.checkin, { opacity: pressed ? 0.75 : 1 }]}
           >
             <Text style={styles.checkinText}>+ 打卡</Text>
           </Pressable>
@@ -69,18 +75,62 @@ export default function HomeScreen() {
       <Section
         title="今日训练"
         right={
-          <Text style={styles.link} onPress={() => router.push('/plans')}>
-            切换计划 →
-          </Text>
+          <Pressable
+            hitSlop={8}
+            onPressIn={vibrateLight}
+            onPress={() => router.push('/plans')}
+            style={({ pressed }) => [styles.switchChip, { opacity: pressed ? 0.75 : 1 }]}
+          >
+            <Text style={styles.switchChipText}>⇄ 切换计划</Text>
+          </Pressable>
         }
       >
-        {daysSinceLast >= 3 && (
-          <Card style={{ marginBottom: spacing.md, backgroundColor: colors.accent + '20', borderColor: colors.accent }}>
+        {/* 首启新用户：欢迎卡（已加载、且从未训练过） */}
+        {loaded && daysSinceLast === -1 && (
+          <Card
+            style={{
+              marginBottom: spacing.md,
+              backgroundColor: colors.cardAlt,
+              borderColor: colors.primary,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 32, marginRight: spacing.sm }}>🎯</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: '700', fontSize: font.h3 }}>
+                  欢迎，准备开启你的第一次训练
+                </Text>
+                <Text style={{ color: colors.textDim, fontSize: font.small, marginTop: 2 }}>
+                  从今日推荐入手，跟着虚拟教练完成第一组动作。
+                </Text>
+              </View>
+            </View>
+            <Button
+              title="开始第一次训练"
+              onPress={() => router.push('/training/today')}
+              style={{ marginTop: spacing.md }}
+            />
+          </Card>
+        )}
+
+        {/* 老用户回归提醒（至少有一条记录，且已 3+ 天没练） */}
+        {loaded && daysSinceLast >= 3 && (
+          <Card
+            style={{
+              marginBottom: spacing.md,
+              backgroundColor: colors.accent + '20',
+              borderColor: colors.accent,
+            }}
+          >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={{ fontSize: 32, marginRight: spacing.sm }}>🧘</Text>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.accent, fontWeight: '700', fontSize: font.h3 }}>你已经 {daysSinceLast === 999 ? '很久' : `${daysSinceLast} 天`} 没练啦！</Text>
-                <Text style={{ color: colors.textDim, fontSize: font.small, marginTop: 2 }}>今天不打球？做个 10 分钟的静力拉伸或者核心力量，把火苗续上吧！</Text>
+                <Text style={{ color: colors.accent, fontWeight: '700', fontSize: font.h3 }}>
+                  你已经 {daysSinceLast} 天没练啦！
+                </Text>
+                <Text style={{ color: colors.textDim, fontSize: font.small, marginTop: 2 }}>
+                  今天不打球？做个 10 分钟的静力拉伸或者核心力量，把火苗续上吧！
+                </Text>
               </View>
             </View>
             <Button
@@ -142,22 +192,10 @@ export default function HomeScreen() {
       <Section title="快捷入口">
         <View style={styles.quickGrid}>
           <QuickCard
-            label="训练计划"
-            emoji="📋"
-            desc="切换 / 新建 / 编辑"
-            onPress={() => router.push('/plans')}
-          />
-          <QuickCard
             label="动作识别"
             emoji="🎥"
             desc="开摄像头实时纠错"
             onPress={() => router.push('/pose')}
-          />
-          <QuickCard
-            label="体能训练"
-            emoji="💪"
-            desc="爆发力 / 核心"
-            onPress={() => router.push('/training/fitness')}
           />
           <QuickCard
             label="录像复盘"
@@ -239,7 +277,14 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   checkinText: { color: '#fff', fontWeight: '700' },
-  link: { color: colors.primary, fontSize: font.small },
+  switchChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  switchChipText: { color: colors.primary, fontSize: font.small, fontWeight: '600' },
   planTitle: { color: colors.text, fontSize: font.h3, fontWeight: '700' },
   planName: { color: colors.text, fontSize: font.h3, fontWeight: '700' },
   planMode: { color: colors.primary, marginTop: 4, fontSize: font.small },
