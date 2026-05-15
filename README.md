@@ -109,6 +109,24 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.9.0 · 2026-05-15
+
+- **产品需求**：首页「连击勋章卡」5 状态化 + 破纪录里程碑吐司。
+- **开发改动**：
+  - `src/features/streak/StreakBadgeCard.tsx`：新增 5 状态派生逻辑 `deriveStreakView` (A~F) 及其 UI 卡片组件，包含满格呼吸进度条与 A 状态金边脉动动画。
+  - `src/features/streak/MilestoneToast.tsx`：新增全局置顶的动画吐司通知组件，支持破纪录与整数天数里程碑弹窗。
+  - `src/db/trainingLogs.ts`：新增 `getStreakStats()` 减少多次查表，单次查询并计算当前连击、历史最长连击、今日是否打卡、首练日期。
+  - `app/(tabs)/index.tsx`：移除旧版零散状态与样式，重构以接入 `StreakBadgeCard` 和 `MilestoneToast`，通过 `useFocusEffect` 进行数据请求、fingerprint 去抖与发震动。
+- **测试结论**：
+  - ✅ `getStreakStats` 单次查询+内存计算逻辑完善
+  - ✅ 5 种连击状态（A~F）优先级匹配，且 D 状态文案/按钮均按设计呈现
+  - ✅ 进度条满格动画与 A 状态金边动画+震动正常挂载
+  - ✅ 里程碑吐司弹窗出现时机正确，同 session 不重复触发
+  - ✅ 其他卡片（欢迎卡、回归卡等）与原有逻辑完全兼容互斥补位
+  - ⚠️ 仅静态走查验证逻辑，真机震动强度及脉动动画在双端的视觉效果需后续观察
+- **typecheck**：✅ `tsc --noEmit` 通过
+
+
 ### v0.8.0 · 2026-05-15
 
 - **产品需求**：训练 run 页本地化背景 + 训练完成「冠军时刻」结算页升级。

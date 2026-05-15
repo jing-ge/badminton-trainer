@@ -108,6 +108,59 @@ export async function getStreak(): Promise<number> {
   return streak;
 }
 
+// v0.9.0：一次性返回连击勋章卡所需的全量 stats，避免多次查表
+export async function getStreakStats(): Promise<{
+  current: number;
+  best: number;
+  todayLogged: boolean;
+  firstLogDate: string | null;
+}> {
+  const db = await getDB();
+  const rows = await db.getAllAsync<{ date: string }>(
+    `SELECT DISTINCT date FROM training_logs ORDER BY date ASC`
+  );
+  const dates = rows.map((r: any) => r.date as string);
+  if (dates.length === 0) {
+    return { current: 0, best: 0, todayLogged: false, firstLogDate: null };
+  }
+
+  const set = new Set(dates);
+  const today = dayjs().format('YYYY-MM-DD');
+  const todayLogged = set.has(today);
+
+  // current：与 getStreak 同语义——今天有则从今天起，否则从昨天起
+  let current = 0;
+  let cursor = dayjs();
+  if (!set.has(cursor.format('YYYY-MM-DD'))) {
+    cursor = cursor.subtract(1, 'day');
+  }
+  while (set.has(cursor.format('YYYY-MM-DD'))) {
+    current++;
+    cursor = cursor.subtract(1, 'day');
+  }
+
+  // best：在升序 distinct dates 上遍历最长连续段
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < dates.length; i++) {
+    const prev = dayjs(dates[i - 1]);
+    const curr = dayjs(dates[i]);
+    if (curr.diff(prev, 'day') === 1) {
+      run++;
+      if (run > best) best = run;
+    } else {
+      run = 1;
+    }
+  }
+
+  return {
+    current,
+    best,
+    todayLogged,
+    firstLogDate: dates[0] ?? null,
+  };
+}
+
 function safeParse<T>(s: string | null, fallback: T): T {
   if (!s) return fallback;
   try {

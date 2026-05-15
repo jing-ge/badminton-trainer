@@ -1,32 +1,50 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Section } from '@/components/Section';
 import { Button } from '@/components/Button';
 import { colors, font, radius, spacing } from '@/theme/tokens';
-import { getStreak, listTrainingLogs, TrainingLog } from '@/db/trainingLogs';
+import {
+  getStreakStats,
+  listTrainingLogs,
+  TrainingLog,
+} from '@/db/trainingLogs';
 import { getActivePlan } from '@/db/plans';
 import { selectToday, TodaySelection } from '@/data/selectToday';
-import { vibrateLight } from '@/utils/haptics';
+import { vibrateLight, vibrateHeavy } from '@/utils/haptics';
+import {
+  StreakBadgeCard,
+  type StreakStats,
+} from '@/features/streak/StreakBadgeCard';
+import { MilestoneToast } from '@/features/streak/MilestoneToast';
 
 export default function HomeScreen() {
   const router = useRouter();
   const [today, setToday] = useState<TodaySelection | null>(null);
-  const [streak, setStreak] = useState(0);
+  const [streakStats, setStreakStats] = useState<StreakStats | null>(null);
   const [recent, setRecent] = useState<TrainingLog[]>([]);
   // -1 表示尚未训练过；0+ 表示距离最后一次训练的天数
   const [daysSinceLast, setDaysSinceLast] = useState(0);
   const [loaded, setLoaded] = useState(false);
+
+  // 里程碑吐司：单 session 内同 fingerprint 只弹一次
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const shownToastFps = useRef<Set<string>>(new Set());
+  // A 状态震动去抖
+  const lastHapticFp = useRef<string | null>(null);
+  // prevBest 缓存——首次 undefined 不触发吐司
+  const prevBestRef = useRef<number | undefined>(undefined);
 
   useFocusEffect(
     useCallback(() => {
       (async () => {
         const plan = await getActivePlan();
         setToday(selectToday(plan));
-        setStreak(await getStreak());
+        const stats = await getStreakStats();
+        setStreakStats(stats);
         const logs = await listTrainingLogs(3);
         setRecent(logs);
 
@@ -37,6 +55,33 @@ export default function HomeScreen() {
           setDaysSinceLast(-1);
         }
         setLoaded(true);
+
+        // 破纪录震动（A 状态 + fingerprint 变化）
+        const fp = `${stats.current}-${stats.best}-${stats.todayLogged}`;
+        const isA = stats.current > stats.best && stats.todayLogged;
+        if (isA && lastHapticFp.current !== fp) {
+          vibrateHeavy();
+          lastHapticFp.current = fp;
+        }
+
+        // 吐司：破纪录 / 整数里程碑
+        const prevBest = prevBestRef.current;
+        const milestoneSet = new Set([7, 14, 30, 50, 100]);
+        let toastText: string | null = null;
+        if (prevBest !== undefined && stats.current > prevBest) {
+          toastText = `💎 个人新纪录 ${stats.current} 天！`;
+        } else if (milestoneSet.has(stats.current)) {
+          if (stats.current === 7) toastText = '🌱 一周连击达成';
+          else if (stats.current === 14) toastText = '🌿 两周连击达成';
+          else if (stats.current === 30) toastText = '🌳 一个月铁人';
+          else if (stats.current === 50) toastText = '⚡ 50 天连击';
+          else if (stats.current === 100) toastText = '👑 百日筑基';
+        }
+        if (toastText && !shownToastFps.current.has(fp)) {
+          shownToastFps.current.add(fp);
+          setToastMsg(toastText);
+        }
+        prevBestRef.current = stats.best;
       })();
     }, []),
   );
@@ -50,27 +95,23 @@ export default function HomeScreen() {
 
   return (
     <Screen>
+      <MilestoneToast
+        visible={toastMsg !== null}
+        message={toastMsg ?? ''}
+        onDismiss={() => setToastMsg(null)}
+      />
+
       <View style={styles.hero}>
         <Text style={styles.greet}>{getGreeting()}，准备训练了吗？</Text>
         <Text style={styles.date}>{dayjs().format('YYYY 年 M 月 D 日 dddd')}</Text>
       </View>
 
-      <Card style={{ marginBottom: spacing.lg }}>
-        <View style={styles.streakRow}>
-          <View>
-            <Text style={styles.streakNum}>🔥 {streak}</Text>
-            <Text style={styles.streakLabel}>连续训练天数</Text>
-          </View>
-          <Pressable
-            hitSlop={8}
-            onPressIn={vibrateLight}
-            onPress={() => router.push('/training/log')}
-            style={({ pressed }) => [styles.checkin, { opacity: pressed ? 0.75 : 1 }]}
-          >
-            <Text style={styles.checkinText}>+ 打卡</Text>
-          </Pressable>
-        </View>
-      </Card>
+      {streakStats && (
+        <StreakBadgeCard
+          stats={streakStats}
+          onPressCta={() => router.push('/training/log')}
+        />
+      )}
 
       <Section
         title="今日训练"
@@ -263,20 +304,6 @@ const styles = StyleSheet.create({
   hero: { marginBottom: spacing.lg },
   greet: { color: colors.text, fontSize: font.h1, fontWeight: '700' },
   date: { color: colors.textDim, marginTop: 4, fontSize: font.small },
-  streakRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  streakNum: { color: colors.text, fontSize: 32, fontWeight: '800' },
-  streakLabel: { color: colors.textDim, fontSize: font.small, marginTop: 4 },
-  checkin: {
-    backgroundColor: colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: radius.pill,
-  },
-  checkinText: { color: '#fff', fontWeight: '700' },
   switchChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
