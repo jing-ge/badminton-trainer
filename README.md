@@ -109,6 +109,19 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.15.0 · 2026-05-15
+
+- **产品需求**：计划编辑页周计划「7 天总览卡」+ 选中日联动过滤 + addModule 默认 weekday 跟随选中日。
+- **开发改动**：
+  - `src/features/plans/WeekOverviewCard.tsx`：抽离新增纯展示 7 天总览卡组件，通过颜色强度细分每日模块的用时与负载。
+  - `app/plans/[id]/edit.tsx`：接入 `WeekOverviewCard`；计算并传递包含 7 日分布与未分配数的 `dayStats` 与 `unassignedCount`；增加 `selectedWeekday` 用于在模块列表进行基于星期的精准过滤联动，配合增加空选占位引导；重写了 `addModule` 使其在联动选中后可以自动装配对应 weekday。
+- **测试结论**：
+  - ✅ 组件显隐条件正常：仅在 `weekly` 且有模块时才展示，0 模块时或 random/pool 模式下被安全隐藏，空数据时显示虚线引导框且附带正确的关联按钮动作。
+  - ✅ 总览卡渲染及交互顺畅：数据按 `日一二三四五六` 对齐，三段式数据渲染及过载颜色（`primary`/`warn`/`danger`）响应边界准确。空数据 `opacity 0.4` 及长文本防截断工作正常。点击带有选框高亮和 `vibrateLight` 反馈且能二次取消。
+  - ✅ 过滤联动有效：过滤态开启后下方只列出选中日的卡片并增加清除筛选项；在某天为 0 个时显示的引导卡上添加的模块能够完美默认带上当前日期的 tag；其余非 `weekly` 状态添加不受影响。
+  - ✅ 无相关外部环境污染及多余 NPM 引入。未硬编码组件配色；既有功能模块及配置不受影响。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.14.0 · 2026-05-15
 
 - **产品需求**：stats 顶部「时间舱」——周/月切换 + 同比箭头 + 数字滚动动画。

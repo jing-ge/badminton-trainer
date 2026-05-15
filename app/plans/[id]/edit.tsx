@@ -7,6 +7,7 @@ import { Button } from '@/components/Button';
 import { colors, font, radius, spacing } from '@/theme/tokens';
 import type { Plan, PlanMode, TrainingModule } from '@/data/planTypes';
 import { getPlanById, savePlan } from '@/db/plans';
+import { WeekOverviewCard, type DayStat } from '@/features/plans/WeekOverviewCard';
 
 const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 const WEEK_SHORT = ['日', '一', '二', '三', '四', '五', '六'];
@@ -15,6 +16,7 @@ export default function PlanEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [selectedWeekday, setSelectedWeekday] = useState<number | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -47,13 +49,17 @@ export default function PlanEditScreen() {
 
   function addModule() {
     if (!plan) return;
+    let weekday: number | null = null;
+    if (plan.mode === 'weekly') {
+      weekday = selectedWeekday !== null ? selectedWeekday : 1;
+    }
     const newMod: TrainingModule = {
       id: `mod-${Date.now()}`,
       name: '新建训练模块',
       focus: '填写重点',
       category: 'tech',
       items: [],
-      weekday: plan.mode === 'weekly' ? 1 : null,
+      weekday,
       weight: 1,
     };
     const nextModules = [...plan.modules, newMod];
@@ -71,6 +77,24 @@ export default function PlanEditScreen() {
   }
 
   if (!plan) return <Screen><Text style={{ color: colors.textDim }}>加载中...</Text></Screen>;
+
+  // weekly 模式 7 天统计（仅 weekly 用到，但 hook 顺序固定不能放条件里 → 用 plan.modules 直接派生）
+  const dayStats: DayStat[] = (() => {
+    const stats: DayStat[] = Array.from({ length: 7 }, () => ({ count: 0, mins: 0 }));
+    for (const m of plan.modules) {
+      if (m.weekday == null || m.weekday < 0 || m.weekday > 6) continue;
+      stats[m.weekday].count += 1;
+      stats[m.weekday].mins += m.items.reduce((s, it) => s + (it.duration_min || 0), 0);
+    }
+    return stats;
+  })();
+  const unassignedCount = plan.modules.filter((m) => m.weekday == null).length;
+
+  const showOverview = plan.mode === 'weekly' && plan.modules.length > 0;
+  const visibleModules =
+    showOverview && selectedWeekday !== null
+      ? plan.modules.filter((m) => m.weekday === selectedWeekday)
+      : plan.modules;
 
   return (
     <Screen scroll={false}>
@@ -109,10 +133,30 @@ export default function PlanEditScreen() {
           )}
         </Card>
 
+        {showOverview && (
+          <WeekOverviewCard
+            dayStats={dayStats}
+            unassignedCount={unassignedCount}
+            selectedWeekday={selectedWeekday}
+            onSelect={setSelectedWeekday}
+          />
+        )}
+
         <View style={styles.headerRow}>
-          <Text style={styles.sectionTitle}>包含的训练模块 ({plan.modules.length})</Text>
+          <Text style={styles.sectionTitle}>包含的训练模块 ({visibleModules.length})</Text>
           <Button title="+ 添加模块" variant="ghost" onPress={addModule} />
         </View>
+
+        {showOverview && selectedWeekday !== null && (
+          <View style={styles.filterBar}>
+            <Text style={styles.filterText}>
+              筛选：周{WEEK_SHORT[selectedWeekday]} · 显示 {visibleModules.length} 个模块
+            </Text>
+            <Pressable onPress={() => setSelectedWeekday(null)} hitSlop={8}>
+              <Text style={styles.filterClear}>清除筛选 ×</Text>
+            </Pressable>
+          </View>
+        )}
 
         {plan.modules.length === 0 ? (
           <Card style={{ borderStyle: 'dashed', borderColor: colors.border }}>
@@ -121,8 +165,20 @@ export default function PlanEditScreen() {
               点上方「+ 添加模块」开始构建你的训练内容,每个模块可以放多个训练项(如:正手高远 5 分钟 + 步法 3 分钟)
             </Text>
           </Card>
+        ) : showOverview && selectedWeekday !== null && visibleModules.length === 0 ? (
+          <Card style={{ borderStyle: 'dashed', borderColor: colors.border }}>
+            <Text style={{ color: colors.text, fontWeight: '600', fontSize: font.body }}>
+              周{WEEK_SHORT[selectedWeekday]} 还没排训练
+            </Text>
+            <Text style={{ color: colors.textDim, fontSize: font.small, marginTop: 4 }}>
+              点下方『+ 添加模块』，新模块会自动排到周{WEEK_SHORT[selectedWeekday]}
+            </Text>
+            <View style={{ marginTop: spacing.md }}>
+              <Button title={`为周${WEEK_SHORT[selectedWeekday]} 添加模块`} onPress={addModule} />
+            </View>
+          </Card>
         ) : (
-          plan.modules.map((m) => (
+          visibleModules.map((m) => (
             <Card key={m.id} style={{ marginBottom: spacing.sm }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <View style={{ flex: 1 }}>
@@ -205,4 +261,16 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', marginTop: spacing.md, gap: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
   actBtn: { flex: 1, alignItems: 'center' },
   actText: { color: colors.primary, fontWeight: '600' },
+  filterBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.cardAlt,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  filterText: { color: colors.text, fontSize: font.small },
+  filterClear: { color: colors.primary, fontSize: font.small, fontWeight: '600' },
 });
