@@ -109,6 +109,22 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.5.0 · 2026-05-15
+
+- **产品需求**：完善 pose 占位页对教程跳入的承接、补 schedule 删除确认与表单重置、加固 replay 数据守卫、清理代码注释噪音、改通俗 pose 文案。
+- **开发改动**：
+  - `app/pose/index.tsx`：读取 `tutorial` 参数,查到则顶部展示返回按钮 + 醒目的"你将要检测的动作"目标卡;底部"C++ 模型推理库"等技术黑话改为面向用户的通俗承诺文案。
+  - `app/schedule/index.tsx`：新增 `resetForm()`,添加成功后重置 title/weekday/time;`remove` 改为先 Alert 确认（Web 走 `window.confirm`），文案带具体提醒摘要。
+  - `app/replay/index.tsx`：`c.annotations.length` 加可选链与默认 0,防旧数据无 annotations 字段崩溃。
+  - `app/training/fitness.tsx`：清理 4 行心路历程注释,去掉未使用的 `radius` 导入。
+- **测试结论**：
+  - ✅ pose 页 ?tutorial=clear 等参数透传,findTutorial 命中渲染目标卡
+  - ✅ schedule add 成功路径后表单回到默认值
+  - ✅ replay 数据守卫(`?.length ?? 0`)对 undefined 安全
+  - ⚠️ schedule 通知权限交互需真机回归(Web 不会触发)
+  - ⚠️ pose 页"返回"按钮覆盖在原 layout header 上的视觉,真机需观察
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.4.0 · 2026-05-15
 
 - **产品需求**：教程与计划列表体验补强：搜索能力、CTA 透传 id、空态卡、重名守卫、动画分发组件抽象、危险操作视觉分组。

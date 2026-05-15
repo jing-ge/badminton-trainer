@@ -2,7 +2,7 @@ import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
-import { colors, font, spacing, radius } from '@/theme/tokens';
+import { colors, font, spacing } from '@/theme/tokens';
 import { defaultFitnessPlan } from '@/data/presets';
 
 export default function FitnessScreen() {
@@ -23,10 +23,7 @@ export default function FitnessScreen() {
             <Pressable
               key={m.id}
               onPress={() => {
-                // 点击后直接带着这个模块的 ID，进入我们写的沉浸式训练器 run.tsx
-                // 注意：为了让 run.tsx 能从 plan.modules 里找到，我们需要传 plan_id 和 module_id 进去，
-                // 但 run.tsx 现在默认从 activePlan 找 module，所以我们需要把 activePlan 暂时存一下或者把 item 直接传过去。
-                // 为了简单，因为 defaultFitnessPlan 也是 defaultPlans 之一，可以在 run.tsx 里做支持。
+                // 通过传 plan_id + mid 让 run.tsx 从默认体能计划里加载该模块
                 router.push({ pathname: '/training/run', params: { plan_id: plan.id, mid: m.id } });
               }}
               style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}

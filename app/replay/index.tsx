@@ -73,7 +73,7 @@ export default function ReplayList() {
                   <View style={{ flex: 1, marginLeft: spacing.md }}>
                     <Text style={styles.clipTitle}>{c.title}</Text>
                     <Text style={styles.clipMeta}>
-                      {c.annotations.length} 条标注 · 长按删除
+                      {c.annotations?.length ?? 0} 条标注 · 长按删除
                     </Text>
                   </View>
                   <Text style={{ color: colors.textDim, fontSize: 22 }}>›</Text>

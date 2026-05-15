@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
@@ -14,12 +14,15 @@ import {
 import { cancelReminder, ensureNotificationPermission, scheduleWeeklyReminder } from '@/utils/notifications';
 
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+const DEFAULT_TITLE = '训练时间到';
+const DEFAULT_WEEKDAY = 1;
+const DEFAULT_TIME = '19:00';
 
 export default function ScheduleScreen() {
   const [items, setItems] = useState<Schedule[]>([]);
-  const [title, setTitle] = useState('训练时间到');
-  const [weekday, setWeekday] = useState(1);
-  const [time, setTime] = useState('19:00');
+  const [title, setTitle] = useState(DEFAULT_TITLE);
+  const [weekday, setWeekday] = useState(DEFAULT_WEEKDAY);
+  const [time, setTime] = useState(DEFAULT_TIME);
 
   async function reload() {
     setItems(await listSchedules());
@@ -28,6 +31,12 @@ export default function ScheduleScreen() {
   useEffect(() => {
     reload();
   }, []);
+
+  function resetForm() {
+    setTitle(DEFAULT_TITLE);
+    setWeekday(DEFAULT_WEEKDAY);
+    setTime(DEFAULT_TIME);
+  }
 
   async function add() {
     const [hStr, mStr] = time.split(':');
@@ -51,6 +60,7 @@ export default function ScheduleScreen() {
     }
     await insertSchedule({ title, weekday, hour: h, minute: m, notification_id: nid });
     await reload();
+    resetForm();
   }
 
   async function toggle(s: Schedule) {
@@ -70,9 +80,20 @@ export default function ScheduleScreen() {
   }
 
   async function remove(s: Schedule) {
-    if (s.notification_id) await cancelReminder(s.notification_id);
-    await deleteSchedule(s.id);
-    await reload();
+    const summary = `${s.title} · 每周${WEEK[s.weekday]} ${String(s.hour).padStart(2, '0')}:${String(s.minute).padStart(2, '0')}`;
+    const doRemove = async () => {
+      if (s.notification_id) await cancelReminder(s.notification_id);
+      await deleteSchedule(s.id);
+      await reload();
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(`确认删除提醒?\n${summary}`)) await doRemove();
+      return;
+    }
+    Alert.alert('删除提醒?', summary, [
+      { text: '取消', style: 'cancel' },
+      { text: '删除', style: 'destructive', onPress: doRemove },
+    ]);
   }
 
   return (
