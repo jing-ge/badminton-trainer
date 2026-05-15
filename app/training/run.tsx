@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View, ImageBackground } from 'react-native';
+import { Alert, Animated, Platform, Pressable, StyleSheet, Text, View, ImageBackground } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { Audio, Video, ResizeMode } from 'expo-av';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
+import dayjs from 'dayjs';
 import { Screen } from '@/components/Screen';
 import { vibrateLight, vibrateMedium, vibrateSuccess, vibrateHeavy } from '@/utils/haptics';
 import { colors, font, radius, spacing } from '@/theme/tokens';
@@ -12,6 +13,7 @@ import { getActivePlan } from '@/db/plans';
 import { selectToday } from '@/data/selectToday';
 import type { TrainingItem, TrainingModule } from '@/data/planTypes';
 import { TutorialMedia } from '@/components/animations/TutorialMedia';
+import { getStreak, listTrainingLogs } from '@/db/trainingLogs';
 
 import { defaultPlans } from '@/data/presets';
 
@@ -62,6 +64,10 @@ export default function TrainingRunScreen() {
   const [currentItemDurationSec, setCurrentItemDurationSec] = useState(0); // 当前项总时长(应用 conditionScale 后),用于进度条
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 完成态：连续天数预告 + 徽章入场动画
+  const [streakPreview, setStreakPreview] = useState<number | null>(null);
+  const badgeAnim = useRef(new Animated.Value(0)).current; // 0→1 用于 scale+opacity
 
   // 背景音乐和音效引用
   const bgmSoundRef = useRef<Audio.Sound | null>(null);
@@ -215,6 +221,31 @@ export default function TrainingRunScreen() {
     }, 1000);
     return stopTimer;
   }, [status, items, conditionScale]);
+
+  // 进入 finished：拉一次 streak + 判定今日是否已打卡，并跑徽章入场动画
+  useEffect(() => {
+    if (status !== 'finished') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [streak, recent] = await Promise.all([getStreak(), listTrainingLogs(1)]);
+        if (cancelled) return;
+        const today = dayjs().format('YYYY-MM-DD');
+        const alreadyLoggedToday = recent.length > 0 && recent[0].date === today;
+        // 今日已打卡 → 当前 streak 已含今天；未打卡 → 打卡后会变 streak+1
+        setStreakPreview(alreadyLoggedToday ? streak : streak + 1);
+      } catch {
+        if (!cancelled) setStreakPreview(null);
+      }
+    })();
+    badgeAnim.setValue(0);
+    Animated.timing(badgeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+    return () => { cancelled = true; };
+  }, [status]);
 
   function stopTimer() {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -429,6 +460,19 @@ export default function TrainingRunScreen() {
     ]);
   }
 
+  // finished → 再来一组：清状态回到 idle
+  function restartWorkout() {
+    vibrateLight();
+    stopTimer();
+    Speech.stop();
+    setCurrentIndex(0);
+    setTimeLeft(0);
+    setPrepTime(5);
+    setCurrentItemDurationSec(0);
+    setDragValue(null);
+    setStatus('idle');
+  }
+
   if (items.length === 0) {
     return <Screen><Text style={{ color: colors.textDim }}>没有训练项</Text></Screen>;
   }
@@ -499,6 +543,16 @@ export default function TrainingRunScreen() {
 
   if (status === 'finished') {
     const actualMin = items.reduce((acc, it) => acc + Math.max(1, Math.round(it.duration_min * conditionScale)), 0);
+    const plannedTotalMin = items.reduce((a, it) => a + it.duration_min, 0);
+    const completionPct = plannedTotalMin > 0
+      ? Math.min(100, Math.round((actualMin / plannedTotalMin) * 100))
+      : 0;
+    const finishedQuote = conditionScale >= 1
+      ? '满血状态拉满一整套，状态在线 👏'
+      : conditionScale >= 0.75
+        ? '状态一般还能咬牙完成，自律者得自由 💪'
+        : '疲惫的日子也没缺席，这就是冠军心态 🔥';
+
     return (
       <View style={{ flex: 1 }}>
         <Screen scroll={false} transparent={true}>
@@ -510,18 +564,55 @@ export default function TrainingRunScreen() {
             </Pressable>
           </View>
           <View style={styles.centerWrap}>
-            <View style={styles.badgeWrap}>
+            <Animated.View
+              style={[
+                styles.badgeWrap,
+                {
+                  opacity: badgeAnim,
+                  transform: [{
+                    scale: badgeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
+                  }],
+                },
+              ]}
+            >
               <Text style={{ fontSize: 80 }}>🏆</Text>
-            </View>
+            </Animated.View>
             <Text style={[styles.title, { color: colors.warn, fontSize: 36, marginTop: spacing.lg }]}>训练完成！</Text>
-            <Text style={styles.meta}>你今天坚持练完了 {actualMin} 分钟的内容</Text>
-            <Pressable 
-              style={[styles.startBtnBig, { backgroundColor: colors.warn }]} 
+
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryCol}>
+                <Text style={styles.summaryNum}>{actualMin}</Text>
+                <Text style={styles.summaryLabel}>分钟</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryCol}>
+                <Text style={styles.summaryNum}>{items.length}/{items.length}</Text>
+                <Text style={styles.summaryLabel}>完成项</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryCol}>
+                <Text style={styles.summaryNum}>{completionPct}%</Text>
+                <Text style={styles.summaryLabel}>完成率</Text>
+              </View>
+            </View>
+
+            <Text style={styles.finishedQuote}>{finishedQuote}</Text>
+
+            {streakPreview !== null && (
+              <Text style={styles.streakPreview}>🔥 今日打卡后将达到 {streakPreview} 天连续</Text>
+            )}
+
+            <Pressable
+              style={[styles.startBtnBig, { backgroundColor: colors.warn }]}
               onPress={() => {
                 router.replace({ pathname: '/training/log', params: { plan_id: planId, mins: String(actualMin) } });
               }}
             >
               <Text style={[styles.startBtnBigText, { color: '#000' }]}>📝 领取奖励并打卡</Text>
+            </Pressable>
+
+            <Pressable onPress={restartWorkout} style={{ marginTop: spacing.md }}>
+              <Text style={styles.restartLink}>再来一组同样的训练 →</Text>
             </Pressable>
           </View>
         </Screen>
@@ -692,7 +783,7 @@ function WorkoutBackground() {
   return (
     <View style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}>
       <ImageBackground 
-        source={{ uri: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?q=80&w=2000&auto=format&fit=crop' }} 
+        source={require('../../assets/images/court_bg.jpg')}
         style={{ flex: 1, width: '100%', height: '100%' }}
         resizeMode="cover"
       >
@@ -741,5 +832,25 @@ const styles = StyleSheet.create({
   conditionText: { color: colors.textDim, fontWeight: '700', fontSize: font.h3, marginTop: spacing.sm },
   conditionDesc: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
   badgeWrap: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(245, 158, 11, 0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.warn, shadowColor: colors.warn, shadowOpacity: 0.8, shadowRadius: 20, shadowOffset: { width: 0, height: 0 } },
+  summaryCard: {
+    flexDirection: 'row',
+    width: '80%',
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.cardAlt,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  summaryCol: { flex: 1, alignItems: 'center' },
+  summaryNum: { color: colors.text, fontSize: font.h2, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  summaryLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
+  summaryDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.08)' },
+  finishedQuote: { color: colors.text, fontSize: font.body, marginTop: spacing.lg, textAlign: 'center', paddingHorizontal: spacing.lg },
+  streakPreview: { color: colors.primary, fontSize: font.small, marginTop: spacing.sm, fontWeight: '600' },
+  restartLink: { color: colors.textDim, fontSize: font.body, fontWeight: '600' },
 });
 

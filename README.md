@@ -109,6 +109,19 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.8.0 · 2026-05-15
+
+- **产品需求**：训练 run 页本地化背景 + 训练完成「冠军时刻」结算页升级。
+- **开发改动**：
+  - `app/training/run.tsx`：`WorkoutBackground` 替换远程图片为本地资源 `require('../../assets/images/court_bg.jpg')`；`finished` 分支改版，引入 🏆 徽章的入场动画 (`Animated.timing` 600ms scale+opacity)，新增实际时长、完成项数、完成率 3 列 KPI 数据卡，新增根据 `conditionScale` 显示的三挡动态金句，新增连击打卡预告 (`streak` + `listTrainingLogs(1)` 判断今日是否已打)，新增「再来一组」次要 CTA 重置状态回 idle。
+  - 新增本地资源 `assets/images/court_bg.jpg` 及生成脚本 `generate_court_bg.js`。
+- **测试结论**：
+  - ✅ 远程图片已全部替换为本地静态资源（grep `https://` 命中 0），且图大小合法 (30KB)
+  - ✅ 结算页 5 大核心元素（🏆、KPI、金句、打卡预告、主次 CTA）结构与交互逻辑完整
+  - ✅ 次要 CTA `restartWorkout` 状态重置覆盖完整（清 index, timeLeft, durationSec，回退 `idle`）
+  - ✅ 金句显示逻辑匹配 3 挡状态 (`>=1`, `>=0.75`, `<0.75`)，无遗漏
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.7.0 · 2026-05-15
 
 - **产品需求**：5 轮迭代收官——回款历史挂账（run.tsx 复用 TutorialMedia、pose fromBar 定位）+ 实用小升级（Tab Bar 激活态、log 快捷时长、清理 dep）。
