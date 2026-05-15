@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
@@ -9,11 +9,13 @@ import type { Plan, PlanMode, TrainingModule } from '@/data/planTypes';
 import { getPlanById, savePlan } from '@/db/plans';
 
 const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+const WEEK_SHORT = ['日', '一', '二', '三', '四', '五', '六'];
 
 export default function PlanEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [plan, setPlan] = useState<Plan | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     (async () => {
@@ -36,6 +38,13 @@ export default function PlanEditScreen() {
     await savePlan(next);
   }
 
+  async function updateModule(mid: string, patch: Partial<TrainingModule>) {
+    if (!plan) return;
+    const next = { ...plan, modules: plan.modules.map((m) => (m.id === mid ? { ...m, ...patch } : m)) };
+    setPlan(next);
+    await savePlan(next);
+  }
+
   function addModule() {
     if (!plan) return;
     const newMod: TrainingModule = {
@@ -47,7 +56,10 @@ export default function PlanEditScreen() {
       weekday: plan.mode === 'weekly' ? 1 : null,
       weight: 1,
     };
-    updatePlan({ modules: [...plan.modules, newMod] });
+    const nextModules = [...plan.modules, newMod];
+    updatePlan({ modules: nextModules });
+    // 滚到底,让用户看到刚添加的模块
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   }
 
   function removeModule(mid: string) {
@@ -62,7 +74,7 @@ export default function PlanEditScreen() {
 
   return (
     <Screen scroll={false}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 100 }}>
         <Card style={{ marginBottom: spacing.md }}>
           <Text style={styles.label}>计划名称</Text>
           <TextInput
@@ -102,33 +114,55 @@ export default function PlanEditScreen() {
           <Button title="+ 添加模块" variant="ghost" onPress={addModule} />
         </View>
 
-        {plan.modules.map((m, i) => (
-          <Card key={m.id} style={{ marginBottom: spacing.sm }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Text style={styles.modName}>{m.name}</Text>
-                  {plan.mode === 'weekly' && m.weekday !== undefined && m.weekday !== null && (
-                    <Text style={styles.modTag}>{WEEK_LABELS[m.weekday]}</Text>
-                  )}
-                  {plan.mode === 'random' && m.weight !== 1 && (
-                    <Text style={styles.modTag}>权重 x{m.weight}</Text>
-                  )}
-                </View>
-                <Text style={styles.modFocus}>{m.focus}</Text>
-                <Text style={styles.modMeta}>{m.items.length} 个训练项</Text>
-              </View>
-            </View>
-            <View style={styles.actions}>
-              <Pressable style={styles.actBtn} onPress={() => router.push(`/plans/${plan.id}/module/${m.id}`)}>
-                <Text style={styles.actText}>✏️ 编辑内容</Text>
-              </Pressable>
-              <Pressable style={styles.actBtn} onPress={() => removeModule(m.id)}>
-                <Text style={[styles.actText, { color: colors.danger }]}>🗑 删除</Text>
-              </Pressable>
-            </View>
+        {plan.modules.length === 0 ? (
+          <Card style={{ borderStyle: 'dashed', borderColor: colors.border }}>
+            <Text style={{ color: colors.text, fontWeight: '600', fontSize: font.body }}>📦 还没有训练模块</Text>
+            <Text style={{ color: colors.textDim, fontSize: font.small, marginTop: 4 }}>
+              点上方「+ 添加模块」开始构建你的训练内容,每个模块可以放多个训练项(如:正手高远 5 分钟 + 步法 3 分钟)
+            </Text>
           </Card>
-        ))}
+        ) : (
+          plan.modules.map((m) => (
+            <Card key={m.id} style={{ marginBottom: spacing.sm }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <Text style={styles.modName}>{m.name}</Text>
+                    {plan.mode === 'random' && m.weight !== 1 && (
+                      <Text style={styles.modTag}>权重 x{m.weight}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.modFocus}>{m.focus}</Text>
+                  <Text style={styles.modMeta}>{m.items.length} 个训练项</Text>
+                </View>
+              </View>
+              {plan.mode === 'weekly' && (
+                <View style={styles.weekdayRow}>
+                  {WEEK_SHORT.map((w, idx) => {
+                    const isActive = m.weekday === idx;
+                    return (
+                      <Pressable
+                        key={idx}
+                        onPress={() => updateModule(m.id, { weekday: idx })}
+                        style={[styles.weekdayChip, isActive && styles.weekdayChipActive]}
+                      >
+                        <Text style={[styles.weekdayChipText, isActive && { color: '#fff' }]}>{w}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+              <View style={styles.actions}>
+                <Pressable style={styles.actBtn} onPress={() => router.push(`/plans/${plan.id}/module/${m.id}`)}>
+                  <Text style={styles.actText}>✏️ 编辑内容</Text>
+                </Pressable>
+                <Pressable style={styles.actBtn} onPress={() => removeModule(m.id)}>
+                  <Text style={[styles.actText, { color: colors.danger }]}>🗑 删除</Text>
+                </Pressable>
+              </View>
+            </Card>
+          ))
+        )}
       </ScrollView>
     </Screen>
   );
@@ -152,6 +186,22 @@ const styles = StyleSheet.create({
   modTag: { color: colors.primary, fontSize: font.tiny, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: colors.cardAlt, borderRadius: 4 },
   modFocus: { color: colors.textDim, marginTop: 4 },
   modMeta: { color: colors.textDim, fontSize: font.small, marginTop: 4 },
+  weekdayRow: { flexDirection: 'row', gap: 4, marginTop: spacing.md, flexWrap: 'wrap' },
+  weekdayChip: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.cardAlt,
+  },
+  weekdayChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  weekdayChipText: { color: colors.text, fontWeight: '600', fontSize: font.small },
   actions: { flexDirection: 'row', marginTop: spacing.md, gap: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
   actBtn: { flex: 1, alignItems: 'center' },
   actText: { color: colors.primary, fontWeight: '600' },

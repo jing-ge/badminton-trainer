@@ -1,19 +1,22 @@
-import { useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import dayjs from 'dayjs';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Section } from '@/components/Section';
-import { colors, font, spacing, radius } from '@/theme/tokens';
+import { colors, font, spacing } from '@/theme/tokens';
 import {
   getStreak,
   listTrainingLogs,
   TrainingLog,
 } from '@/db/trainingLogs';
 
+const HISTORY_INITIAL = 20;
+
 export default function StatsScreen() {
   const [streak, setStreak] = useState(0);
   const [logs, setLogs] = useState<TrainingLog[]>([]);
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -25,10 +28,19 @@ export default function StatsScreen() {
   const trainedDays = new Set(logs.map(l => l.date)).size;
   const totalMins = logs.reduce((a, b) => a + b.duration_min, 0);
 
+  // 累计时长 KPI:< 60 分钟显示 m,>= 60 分钟显示 h(可带半精度);避免新用户看到 0h
+  const totalDurationLabel = useMemo(() => {
+    if (totalMins < 60) return `${totalMins}m`;
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    if (h < 10 && m >= 30) return `${h}.5h`;
+    return `${h}h`;
+  }, [totalMins]);
+
   // 计算热力图数据 (最近 90 天)
   const heatmapDays = 90;
   const heatData: { date: string, mins: number, level: number }[] = [];
-  const logMap = new Map();
+  const logMap = new Map<string, number>();
   logs.forEach(l => {
     logMap.set(l.date, (logMap.get(l.date) || 0) + l.duration_min);
   });
@@ -36,19 +48,17 @@ export default function StatsScreen() {
   for (let i = heatmapDays - 1; i >= 0; i--) {
     const d = dayjs().subtract(i, 'day').format('YYYY-MM-DD');
     const mins = logMap.get(d) || 0;
-    let level = 0; // 0: 没练
-    if (mins > 0 && mins <= 20) level = 1;      // 浅绿
-    else if (mins > 20 && mins <= 60) level = 2; // 中绿
-    else if (mins > 60) level = 3;               // 深绿
+    let level = 0;
+    if (mins > 0 && mins <= 20) level = 1;
+    else if (mins > 20 && mins <= 60) level = 2;
+    else if (mins > 60) level = 3;
     heatData.push({ date: d, mins, level });
   }
 
-  // 把热力图切成 7 行一列的形式 (按星期)
+  // 把热力图切成 7 天/列
   const columns: typeof heatData[] = [];
   let currentCol: typeof heatData = [];
-  
   heatData.forEach((item, index) => {
-    // 简单按每 7 天一切列
     currentCol.push(item);
     if (currentCol.length === 7 || index === heatData.length - 1) {
       columns.push(currentCol);
@@ -56,18 +66,35 @@ export default function StatsScreen() {
     }
   });
 
-  // 计算 A:C Ratio (Acute:Chronic Workload Ratio)
-  // 急性负荷: 最近 7 天时长总和
+  // A:C Ratio
   const acuteLoad = heatData.slice(-7).reduce((a, b) => a + b.mins, 0);
-  // 慢性负荷: 最近 28 天日均时长 * 7
   const last28 = heatData.slice(-28);
   const chronicLoad = last28.reduce((a, b) => a + b.mins, 0) / 4;
   const last28Total = last28.reduce((a, b) => a + b.mins, 0);
   const last28Days = last28.filter((d) => d.mins > 0).length;
-  // 样本不足：累计 < 60 分钟 或 训练 < 3 天，不做监测（避免新用户被误报"高风险"）
   const acReady = last28Total >= 60 && last28Days >= 3 && chronicLoad > 0;
   const acRatio = acReady ? (acuteLoad / chronicLoad).toFixed(2) : '—';
   const isHighRisk = acReady && Number(acRatio) > 1.5;
+
+  // 最近 30 天训练类别分布
+  const categoryStats = useMemo(() => {
+    const cutoff = dayjs().subtract(30, 'day').format('YYYY-MM-DD');
+    const counter = new Map<string, number>();
+    let totalLogs = 0;
+    logs.forEach((l) => {
+      if (l.date < cutoff) return;
+      totalLogs++;
+      const cats = l.categories.length > 0 ? l.categories : ['综合'];
+      cats.forEach((c) => counter.set(c, (counter.get(c) ?? 0) + 1));
+    });
+    const ranked = [...counter.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+    const max = ranked[0]?.count ?? 0;
+    return { ranked, totalLogs, max };
+  }, [logs]);
+
+  const visibleLogs = showAllHistory ? logs : logs.slice(0, HISTORY_INITIAL);
 
   return (
     <Screen>
@@ -76,7 +103,7 @@ export default function StatsScreen() {
       <View style={styles.kpiRow}>
         <KPI value={`${streak}`} label="🔥 连续天数" />
         <KPI value={`${trainedDays}`} label="累计打卡(天)" />
-        <KPI value={`${Math.floor(totalMins / 60)}h`} label="累计时长" />
+        <KPI value={totalDurationLabel} label="累计时长" />
       </View>
 
       <Card style={{ marginBottom: spacing.lg, borderColor: isHighRisk ? colors.danger : colors.border }}>
@@ -106,6 +133,31 @@ export default function StatsScreen() {
         )}
       </Card>
 
+      <Section title="最近 30 天训练分布">
+        <Card>
+          {categoryStats.totalLogs === 0 ? (
+            <Text style={styles.empty}>近 30 天还没有打卡记录</Text>
+          ) : (
+            categoryStats.ranked.map((c) => (
+              <View key={c.name} style={styles.barRow}>
+                <Text style={styles.barName}>{c.name}</Text>
+                <View style={styles.barTrack}>
+                  <View
+                    style={[
+                      styles.barFill,
+                      {
+                        width: `${categoryStats.max > 0 ? (c.count / categoryStats.max) * 100 : 0}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.barCount}>{c.count}</Text>
+              </View>
+            ))
+          )}
+        </Card>
+      </Section>
+
       <Section title="最近 90 天训练热力图">
         <Card style={{ padding: spacing.md }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -117,9 +169,9 @@ export default function StatsScreen() {
                                cell.level === 1 ? '#044D29' :
                                cell.level === 2 ? '#1E824C' : '#2ECC71';
                     return (
-                      <View 
-                        key={cell.date} 
-                        style={[styles.heatCell, { backgroundColor: bg }]} 
+                      <View
+                        key={cell.date}
+                        style={[styles.heatCell, { backgroundColor: bg }]}
                       />
                     );
                   })}
@@ -144,31 +196,43 @@ export default function StatsScreen() {
             <Text style={styles.empty}>暂无记录</Text>
           </Card>
         ) : (
-          logs.slice(0, 10).map((l) => (
-            <Card key={l.id} style={{ marginBottom: spacing.sm }}>
-              <View style={styles.logRow}>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.logDate}>{l.date}</Text>
-                    {l.match_result === 'win' && <Text style={{ fontSize: 12 }}>🏆</Text>}
-                    {l.match_result === 'loss' && <Text style={{ fontSize: 12 }}>💔</Text>}
+          <>
+            {visibleLogs.map((l) => (
+              <Card key={l.id} style={{ marginBottom: spacing.sm }}>
+                <View style={styles.logRow}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.logDate}>{l.date}</Text>
+                      {l.match_result === 'win' && <Text style={{ fontSize: 12 }}>🏆</Text>}
+                      {l.match_result === 'loss' && <Text style={{ fontSize: 12 }}>💔</Text>}
+                    </View>
+                    <Text style={styles.logCat}>
+                      {l.categories.join('、') || '综合'}
+                      {l.opponent ? ` (vs ${l.opponent})` : ''}
+                    </Text>
+                    {l.note ? <Text style={styles.logNote}>📝 {l.note}</Text> : null}
                   </View>
-                  <Text style={styles.logCat}>
-                    {l.categories.join('、') || '综合'}
-                    {l.opponent ? ` (vs ${l.opponent})` : ''}
-                  </Text>
-                  {l.note ? <Text style={styles.logNote}>📝 {l.note}</Text> : null}
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.logMins}>{l.duration_min} 分钟</Text>
+                    <Text style={styles.logStar}>
+                      {'★'.repeat(l.intensity)}
+                      {'☆'.repeat(5 - l.intensity)}
+                    </Text>
+                  </View>
                 </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.logMins}>{l.duration_min} 分钟</Text>
-                  <Text style={styles.logStar}>
-                    {'★'.repeat(l.intensity)}
-                    {'☆'.repeat(5 - l.intensity)}
-                  </Text>
-                </View>
-              </View>
-            </Card>
-          ))
+              </Card>
+            ))}
+            {logs.length > HISTORY_INITIAL && (
+              <Pressable
+                onPress={() => setShowAllHistory((v) => !v)}
+                style={({ pressed }) => [styles.expandBtn, { opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={styles.expandText}>
+                  {showAllHistory ? '收起' : `查看全部 ${logs.length} 条 →`}
+                </Text>
+              </Pressable>
+            )}
+          </>
         )}
       </Section>
     </Screen>
@@ -200,4 +264,13 @@ const styles = StyleSheet.create({
   heatCell: { width: 14, height: 14, borderRadius: 3 },
   heatLegend: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: spacing.md },
   heatLegendText: { color: colors.textDim, fontSize: font.tiny, marginHorizontal: 4 },
+  // 类别分布横条图
+  barRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, gap: spacing.sm },
+  barName: { color: colors.text, fontSize: font.small, fontWeight: '600', width: 56 },
+  barTrack: { flex: 1, height: 8, backgroundColor: colors.cardAlt, borderRadius: 4, overflow: 'hidden' },
+  barFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 4 },
+  barCount: { color: colors.textDim, fontSize: font.small, width: 28, textAlign: 'right' },
+  // 历史记录展开按钮
+  expandBtn: { paddingVertical: spacing.md, alignItems: 'center' },
+  expandText: { color: colors.primary, fontSize: font.small, fontWeight: '600' },
 });

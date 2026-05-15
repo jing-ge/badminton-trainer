@@ -109,6 +109,20 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.6.0 · 2026-05-15
+
+- **产品需求**：stats 页可视化深度（训练类别分布横条图、累计时长单位修复、历史记录展开）+ 计划编辑空态/星期 chip/自动滚动。
+- **开发改动**：
+  - `app/(tabs)/stats.tsx`：整文件重写（上一次替换破坏了 JSX 结构,本次干净重建）。新增"最近 30 天训练分布"横条图卡片（基于 `categories` 字段统计 + max 归一化宽度）；累计时长 KPI < 60 显示 `Nm`，>= 60 显示 `Nh`（半精度保留 `.5h`）；历史记录默认 20 条 + 「查看全部 N 条 →」展开按钮。
+  - `app/plans/[id]/edit.tsx`：模块列表空态引导卡（虚线 + 文案）；周计划模式下每个模块卡内嵌 7 个圆形 weekday chip 实时切换；`addModule` 后 `scrollRef.current?.scrollToEnd` 滚到底。
+- **测试结论**：
+  - ✅ stats 整文件经 `tsc` 通过,结构合法（KPI / A:C / 类别分布 / 热力图 / 历史 / 展开按钮 完整渲染）
+  - ✅ 类别分布无数据态走 totalLogs===0 分支
+  - ✅ plan edit 模块为空时显示引导卡而非空白
+  - ✅ weekday chip 点击触发 updateModule 写入 SQLite
+  - ⚠️ stats 重写没有改变可见行为,但 walk-through 时若发现样式微调需求,下一轮跟进
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.5.0 · 2026-05-15
 
 - **产品需求**：完善 pose 占位页对教程跳入的承接、补 schedule 删除确认与表单重置、加固 replay 数据守卫、清理代码注释噪音、改通俗 pose 文案。
