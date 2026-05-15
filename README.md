@@ -109,6 +109,19 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.16.0 · 2026-05-15
+
+- **产品需求**：计划列表页 PlanCard 升级为分类配比预览卡 + sectionHeader 圆点徽标。
+- **开发改动**：
+  - `app/plans/index.tsx`：重构了列表的区域头，增加圆点徽标 (`primary`/`accent`) 及文本优化。
+  - `app/plans/index.tsx`：重构 `PlanCard` 呈现，精简了元数据展示，右侧新增了直观的体量总计 (`N项/Y分钟`)；底层新增支持了基于真实数据聚合 (`computeCategoryStats`) 的训练项比例预览条和对应图例，支持缺失项和占比门槛过滤逻辑。
+- **测试结论**：
+  - ✅ **数据聚合精确**：计算函数按类别准确将模块分钟数聚合并做降序排序，处理了缺少类别的向 `recovery` 兜底动作。
+  - ✅ **UI呈现符合预期**：`sectionHeader` 圆点应用主副色；`PlanCard` 卡片内含 1 行防截断截取标题 `numberOfLines=1`。
+  - ✅ **进度条及图例交互**：8px 横条按 5 段分配百分比宽度及 `2px` 隔离间隙，超过 8% 的分类才展出图例文本且上限 4 个；空模块情况下则采用带描写的灰底占位，这些处理没有破坏原来 `isActive` 的边框和左侧 3px 条效果。
+  - ✅ **安全锁定**：不涉及其它交互（CRUD等回调方法），完全只影响样式和数据可视化展现，其余 `run.tsx`，首页等功能及全局设置依然维持了上一迭代的状态未有污染。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.15.0 · 2026-05-15
 
 - **产品需求**：计划编辑页周计划「7 天总览卡」+ 选中日联动过滤 + addModule 默认 weekday 跟随选中日。
