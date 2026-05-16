@@ -109,6 +109,27 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.26.0 · 2026-05-16
+
+- **Bug 报告**：用户反馈"今天感觉怎么样？"下方三个状态按钮（💪满血/⚡一般/🪫疲惫）**看不见**。
+- **根因**（对比度灾难）：
+  - 背景：`WorkoutBackground` 蒙层后 ≈ `#0B1220`（极深蓝黑）
+  - 按钮 `conditionBtn` 背景 `colors.card` = `#131C2E`（仅比背景亮 8/256，看不出边界）
+  - 边框 `borderColor: 'transparent'`（完全没边框）
+  - 文字 `colors.textDim` 灰
+  - 三者叠加：按钮跟环境融为一体，只剩 emoji 和模糊的灰字漂浮，像没渲染一样
+- **开发改动**（`app/training/run.tsx` 3 行 styles）：
+  - `conditionBtn` 背景 `colors.card` → `colors.cardAlt`（#1A2540，比背景亮 15/256，轮廓清楚）
+  - `conditionBtn` 默认边框 `'transparent'` → `colors.border`（#26324A，所有按钮都有可见外框）
+  - `conditionText` 默认文字色 `colors.textDim` → `colors.text`（白字，主色；选中态仍切 primary 绿）
+- **测试结论**：
+  - ✅ tsc --noEmit 通过
+  - ✅ 三按钮在 court_bg 暗色背景下**轮廓 + 文字都清晰可见**
+  - ✅ 选中态描边切 primary 绿 + 文字切 primary 绿，与默认态对比依然鲜明
+  - ✅ 改动只动 3 行 styles，未触碰其他任何代码 / 视觉布局
+  - ✅ surgical change：未引入新依赖、未改 token、未改其它任何 Tab
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.25.0 · 2026-05-16
 
 - **产品需求 / Bug 报告**：v0.24.0 用户反馈"设置页试听好听，到训练里声音不一样"。排查后定位 3 个症结，统一修复。

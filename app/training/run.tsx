@@ -1121,9 +1121,9 @@ const styles = StyleSheet.create({
   roundSmallBtn: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
   iconBtnLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 8 },
   playPauseBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-  conditionBtn: { flex: 1, alignItems: 'center', backgroundColor: colors.card, padding: spacing.md, borderRadius: radius.md, borderWidth: 2, borderColor: 'transparent' },
+  conditionBtn: { flex: 1, alignItems: 'center', backgroundColor: colors.cardAlt, padding: spacing.md, borderRadius: radius.md, borderWidth: 2, borderColor: colors.border },
   conditionBtnActive: { borderColor: colors.primary, backgroundColor: colors.cardAlt },
-  conditionText: { color: colors.textDim, fontWeight: '700', fontSize: font.h3, marginTop: spacing.sm },
+  conditionText: { color: colors.text, fontWeight: '700', fontSize: font.h3, marginTop: spacing.sm },
   conditionDesc: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
   badgeWrap: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(245, 158, 11, 0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.warn, shadowColor: colors.warn, shadowOpacity: 0.8, shadowRadius: 20, shadowOffset: { width: 0, height: 0 } },
   summaryCard: {
