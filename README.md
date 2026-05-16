@@ -109,6 +109,30 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.17.0 · 2026-05-15
+
+- **产品需求**：训练打卡页 `app/training/log.tsx` 从「问卷调查表」升级为「私教打卡卡」——分类视觉、强度语义、笔记引导、来自 finished 的训练摘要卡、保存动态金句。
+- **开发改动**：
+  - `app/training/log.tsx`：
+    - 新增 `CAT_META`（inline 6 类 emoji + 语义色，参考 train.tsx 的 CATEGORY_META 调性，但 log 的分类与 train 不完全等价，独立维护）
+    - 训练强度 5 颗星下方新增 `INTENSITY_DESC` 行（1=😌轻松/2=🙂适中/3=💪标准/4=🔥高强度/5=⚡极限）
+    - 训练内容 chip 加 emoji 前缀 + 选中态按分类语义色（后场🏸 primary / 前场🤚 primary / 步法👟 accent / 体能💪 warn / 实战⚔️ danger / 发球🎯 primary）
+    - 实战结果配色修正：赢了 → primary（绿）、输了 → textDim（灰）、平局 → warn（橙）
+    - 笔记区加 📝 emoji + maxLength 200 + 字数计数 `N / 200` + 私教引导 placeholder
+    - 顶部「训练已完成」摘要卡：仅当 `mins` 参数来自 finished 跳转时显示，异步拉 active plan 名静默兜底
+    - 保存按钮 "保存" → "✅ 完成打卡"，加 `vibrateSuccess()`，根据 `getStreakStats().current` 切 3 套金句（>=7、>=3、>=1）
+- **测试结论**：
+  - ✅ tsc --noEmit 通过
+  - ✅ 6 个分类 emoji + 选中态语义色正确
+  - ✅ 5 颗星 + 描述行联动；当前 intensity 描述高亮 600 weight
+  - ✅ fromFinished 判断准确（仅 mins 参数存在时显示摘要卡）；planName 拉取失败静默不报错
+  - ✅ 笔记 maxLength 200 强制；字数计数实时
+  - ✅ 实战 win/loss/draw 三态配色按 primary/textDim/warn 语义重新对齐
+  - ✅ Streak 拉取失败时保存仍走默认金句，不阻塞打卡流程
+  - ✅ 未触碰：run.tsx / 首页 streak / tutorial / me / stats / 计划编辑 / PlanCard / agent prompt
+  - ✅ 未引入新 npm 包
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.16.0 · 2026-05-15
 
 - **产品需求**：计划列表页 PlanCard 升级为分类配比预览卡 + sectionHeader 圆点徽标。
