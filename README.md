@@ -109,6 +109,27 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.23.0 · 2026-05-16
+
+- **产品需求**：训练语音呆滞 + 数字"3"特别难听 → 强制普通话发音 + 数字转汉字播报。
+- **背景**：run.tsx 共 14 处 `speak()` 调用，其中倒数 5/4/3/2/1、组数、次数等都把 `String(n)` 直接喂给 TTS。`Speech.speak({ language: 'zh-CN' })` 在部分设备上只是"建议"，TTS 可能 fallback 到英文 voice 把"3"读成 "three"，或读成走调的"3"。
+- **开发改动**（`app/training/run.tsx`，单文件）：
+  - 新增 `numToChinese(n)` + `toChinesePronunciation(text)`：把句子里所有 0-99 的数字 token 转汉字（"3" → "三"；"15" → "十五"；"第 2 组，开始" → "第 二 组，开始"）
+  - 新增挂载 effect 调 `Speech.getAvailableVoicesAsync()`，优先级 `zh-CN > zh-Hans > zh-*`（**排除 zh-TW / zh-HK** 避免粤语腔），选定后存 `zhVoiceRef`，每次 `speak()` 都显式指定 `voice` 参数
+  - 改造 `speak()` 内部：自动 `toChinesePronunciation` 转换 + 注入 `pitch: 0.95`（轻微下移音高，更稳更自然）+ 高 rate（≥1.4）档自动 `× 0.85` 软化，避免"赶"
+  - 14 处现有调用点**零修改**——靠 `speak()` 内部自动转换（surgical change）
+  - 拿不到 voice 列表时静默兜底，仍走 `language: 'zh-CN'`
+- **测试结论**：
+  - ✅ tsc --noEmit 通过
+  - ✅ 倒数 5→1 现在走 "五/四/三/二/一" 汉字播报
+  - ✅ 组间次数 "十五" 等连贯
+  - ✅ "第 2 组，开始" 走 "第 二 组，开始" 转汉字读
+  - ✅ 高 rate 1.5 → 1.275（× 0.85），听感不再"赶"
+  - ✅ 普通话 voice 自动避开 zh-TW / zh-HK
+  - ✅ 未触碰：其它任何 Tab / 组件 / 已冻结区
+  - ✅ 未引入新 npm 包
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.22.0 · 2026-05-15
 
 - **产品需求**：发版前清账——补上自 v0.12.0 起被多次记录的 `resetDB` 漏 `DROP TABLE user_plans` 的挂账。

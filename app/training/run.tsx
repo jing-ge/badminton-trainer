@@ -21,6 +21,29 @@ import { defaultPlans } from '@/data/presets';
 
 const TRANSITION_SECONDS = 5;
 
+// v0.23 语音工具：阿拉伯数字 → 汉字，防止 TTS 把 "3" 读成 "three" / 走调
+// 覆盖 0-99（训练倒数最多到几十；> 99 罕见，原文兜底）
+const DIGIT_CHAR = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+function numToChinese(n: number): string {
+  if (n < 0 || n > 99 || !Number.isInteger(n)) return String(n);
+  if (n < 10) return DIGIT_CHAR[n];
+  if (n === 10) return '十';
+  const tens = Math.floor(n / 10);
+  const ones = n % 10;
+  const tensPart = tens === 1 ? '十' : DIGIT_CHAR[tens] + '十';
+  return ones === 0 ? tensPart : tensPart + DIGIT_CHAR[ones];
+}
+function toChinesePronunciation(text: string): string {
+  // 把所有 0-99 的数字 token 替换成汉字（包含纯数字串 + 句子里的独立数字）
+  // 例：'3' → '三'；'15' → '十五'；'第 2 组' → '第 二 组'
+  return text.replace(/\d+/g, (m) => {
+    const n = parseInt(m, 10);
+    return n >= 0 && n <= 99 ? numToChinese(n) : m;
+  });
+}
+// 普通话语音参数：pitch 略低 0.95 听感更稳；rate 由调用方传
+const SPEECH_BASE_OPTIONS = { language: 'zh-CN', pitch: 0.95 };
+
 const CATEGORY_EMOJI: Record<string, string> = {
   tech: '🏸',
   footwork: '👟',
@@ -97,6 +120,30 @@ export default function TrainingRunScreen() {
   const bgmSoundRef = useRef<Audio.Sound | null>(null);
   const sfxHitRef = useRef<Audio.Sound | null>(null);
   const sfxSqueakRef = useRef<Audio.Sound | null>(null);
+
+  // v0.23 普通话 voice 选择：挂载时拉一次系统可用 voice，挑一个 zh-CN 的固定下来
+  // 防止某些设备默认 fallback 到英文 voice 把 "三" 读成 "three" 或语调走调
+  const zhVoiceRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const voices = await Speech.getAvailableVoicesAsync();
+        if (cancelled) return;
+        // 优先级：zh-CN > zh-Hans > zh（不要 zh-TW / zh-HK，避免粤语腔）
+        const pick =
+          voices.find((v) => v.language === 'zh-CN') ??
+          voices.find((v) => v.language === 'zh-Hans') ??
+          voices.find((v) => v.language?.toLowerCase().startsWith('zh') &&
+                             !v.language.toLowerCase().includes('tw') &&
+                             !v.language.toLowerCase().includes('hk'));
+        if (pick) zhVoiceRef.current = pick.identifier;
+      } catch {
+        // 静默：拿不到 voice 列表就走系统默认（speak 仍会用 language: 'zh-CN' 兜底）
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // 预加载音效
   useEffect(() => {
@@ -360,7 +407,15 @@ export default function TrainingRunScreen() {
 
   function speak(text: string, rate: number = 1.0) {
     Speech.stop();
-    Speech.speak(text, { language: 'zh-CN', rate });
+    const spoken = toChinesePronunciation(text);
+    // 微降 rate 让语音不那么"赶"，呆滞感来自单字 + 高 rate 组合
+    const adjRate = rate >= 1.4 ? rate * 0.85 : rate;
+    const opts: Speech.SpeechOptions = {
+      ...SPEECH_BASE_OPTIONS,
+      rate: adjRate,
+    };
+    if (zhVoiceRef.current) opts.voice = zhVoiceRef.current;
+    Speech.speak(spoken, opts);
   }
 
   function runGhostCoach(item: TrainingItem, timeLeftSec: number, elapsed: number) {
