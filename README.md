@@ -109,6 +109,30 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.21.0 · 2026-05-15
+
+- **产品需求**：录像复盘列表视觉分级（已标注/待标注差异化） + hero 引导条 + 空态文案修正；顺手清理首页残留的"动作识别" QuickCard（v0.20 已在训练 Tab 删过，首页同步清理）。
+- **开发改动**：
+  - `app/replay/index.tsx`：
+    - 顶部新增 hero 卡：clips 空时显示 `📹 把比赛录像变成可复盘的训练资料` + 引导副文案；clips 非空时显示 `共 N 段录像 · 累计 X 条标注` 统计
+    - 列表卡视觉分级：annoCount > 0 → 左 emoji ✍️ + primary 描边 + 大数字 N 条标注（h3 800 primary）；annoCount === 0 → 左 emoji 🎬 + border 描边 + 灰字 `待标注`
+    - "长按删除" 提示移到卡片右上角，font.tiny textDim
+    - 空态文案 "还没有录像，先去录一段比赛吧" → "🎥 还没导入录像，点上方按钮从相册添加"（不再误导用户以为 App 能录像）
+    - 用 spread 取代 style 数组（Card 不接受数组 style）
+  - `app/(tabs)/index.tsx`：
+    - 删除「动作识别」QuickCard 入口（v0.20 训练 Tab 已删，首页同步清理）
+    - 「录像复盘」改为单卡宽屏布局（quickWide 横向布局：emoji + 标题+描述 + › 箭头）
+    - 清理孤儿函数 `QuickCard` 与孤儿样式 `quickGrid / quick`（仅由刚删除的入口使用，按 karpathy 原则）
+- **测试结论**：
+  - ✅ tsc --noEmit 通过
+  - ✅ replay 列表 annoCount 分级渲染（0 vs >0）视觉差异完整
+  - ✅ hero 卡空态/非空态文案切换正确
+  - ✅ 首页 pose 入口已清零（grep `app/(tabs)/index.tsx` 无 `/pose`）
+  - ✅ replay 详情路由 `/replay/[id]` 未动
+  - ✅ 未触碰：run.tsx / streak / tutorial / me / stats / plans / train / 其它 Tab
+  - ✅ 未引入新 npm 包
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.20.0 · 2026-05-15
 
 - **产品需求**：「训练」Tab 整体打磨——周历模式今日卡情绪化（"今天 · 周X" 徽章 + 模块行 ▶ 箭头 + "开始练 →" CTA）+ 休息日文案区分（周末 🏖 / 工作日 ⏸）+ random/pool 模式顶部 hero 卡 + 移除 AI 动作识别入口（用户硬约束）。

@@ -260,20 +260,17 @@ export default function HomeScreen() {
       </Section>
 
       <Section title="快捷入口">
-        <View style={styles.quickGrid}>
-          <QuickCard
-            label="动作识别"
-            emoji="🎥"
-            desc="开摄像头实时纠错"
-            onPress={() => router.push('/pose')}
-          />
-          <QuickCard
-            label="录像复盘"
-            emoji="📹"
-            desc="标注比赛问题点"
-            onPress={() => router.push('/replay')}
-          />
-        </View>
+        <Pressable
+          onPress={() => router.push('/replay')}
+          style={({ pressed }) => [styles.quickWide, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <Text style={{ fontSize: 28 }}>📹</Text>
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text style={styles.quickLabel}>录像复盘</Text>
+            <Text style={styles.quickDesc}>把比赛录像变成可复盘的训练资料</Text>
+          </View>
+          <Text style={{ color: colors.textDim, fontSize: 22 }}>›</Text>
+        </Pressable>
       </Section>
 
       {recent.length > 0 && (
@@ -300,26 +297,6 @@ export default function HomeScreen() {
         </Section>
       )}
     </Screen>
-  );
-}
-
-function QuickCard({
-  label,
-  emoji,
-  desc,
-  onPress,
-}: {
-  label: string;
-  emoji: string;
-  desc: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.quick, { opacity: pressed ? 0.7 : 1 }]}>
-      <Text style={{ fontSize: 28 }}>{emoji}</Text>
-      <Text style={styles.quickLabel}>{label}</Text>
-      <Text style={styles.quickDesc}>{desc}</Text>
-    </Pressable>
   );
 }
 
@@ -363,13 +340,9 @@ const styles = StyleSheet.create({
   planMeta: { color: colors.textDim, marginTop: 4, fontSize: font.small },
   modItem: { color: colors.text, marginTop: spacing.sm, fontSize: font.small },
   empty: { color: colors.textDim, marginTop: spacing.sm },
-  quickGrid: {
+  quickWide: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  quick: {
-    width: '47%',
+    alignItems: 'center',
     backgroundColor: colors.card,
     padding: spacing.lg,
     borderRadius: radius.lg,
