@@ -109,6 +109,17 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.22.0 · 2026-05-15
+
+- **产品需求**：发版前清账——补上自 v0.12.0 起被多次记录的 `resetDB` 漏 `DROP TABLE user_plans` 的挂账。
+- **开发改动**：
+  - `src/db/index.ts`：`resetDB()` 内 DROP 列表追加 `DROP TABLE IF EXISTS user_plans;`，与 migrate 中的 CREATE TABLE 对齐。
+- **测试结论**：
+  - ✅ tsc --noEmit 通过
+  - ✅ 改动仅 1 行，零回归面
+  - ✅ 与 migrate 7 张表（training_logs / pose_sessions / replay_clips / schedules / user_plans / tutorial_favorites / tutorial_views）DROP 配对完整
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.21.0 · 2026-05-15
 
 - **产品需求**：录像复盘列表视觉分级（已标注/待标注差异化） + hero 引导条 + 空态文案修正；顺手清理首页残留的"动作识别" QuickCard（v0.20 已在训练 Tab 删过，首页同步清理）。

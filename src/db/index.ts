@@ -96,6 +96,7 @@ export async function resetDB() {
     DROP TABLE IF EXISTS pose_sessions;
     DROP TABLE IF EXISTS replay_clips;
     DROP TABLE IF EXISTS schedules;
+    DROP TABLE IF EXISTS user_plans;
     DROP TABLE IF EXISTS tutorial_favorites;
     DROP TABLE IF EXISTS tutorial_views;
   `);
