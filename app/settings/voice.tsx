@@ -8,7 +8,8 @@ import { Card } from '@/components/Card';
 import { colors, font, radius, spacing } from '@/theme/tokens';
 import { vibrateLight } from '@/utils/haptics';
 
-const PREVIEW_TEXT = '准备开始训练，五，四，三，二，一';
+// v0.25 试听文本：连贯句 + 训练实际倒数（单字断句）— 让设置页所听即训练所得
+const PREVIEW_TEXT = '准备开始训练。五。四。三。二。一。开始';
 
 type VoiceItem = {
   id: string;
@@ -95,7 +96,7 @@ export default function VoiceSettings() {
     Speech.stop();
     const opts: Speech.SpeechOptions = { language: 'zh-CN', rate: next, pitch };
     if (selectedId) opts.voice = selectedId;
-    Speech.speak('五，四，三，二，一', opts);
+    Speech.speak('五。四。三。二。一', opts);
   }
 
   function adjustPitch(delta: number) {
@@ -106,7 +107,7 @@ export default function VoiceSettings() {
     Speech.stop();
     const opts: Speech.SpeechOptions = { language: 'zh-CN', rate, pitch: next };
     if (selectedId) opts.voice = selectedId;
-    Speech.speak('五，四，三，二，一', opts);
+    Speech.speak('五。四。三。二。一', opts);
   }
 
   return (

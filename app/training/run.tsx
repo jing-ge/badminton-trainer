@@ -350,11 +350,11 @@ export default function TrainingRunScreen() {
           stopTimer();
           setStatus('running');
           vibrateMedium();
-          speak('开始', 1.0);
+          speakRaw('开始');
           return 0;
         }
-        // v0.24 倒数自然化：rate 1.0 让 TTS 有完整音节展开；用汉字直读，避免数字识别歧义
-        speak(numToChinese(prev - 1), 1.0);
+        // v0.25 用 speakRaw 不打断前一个字，让"四、三、二、一"在 TTS 队列里自然衔接
+        speakRaw(numToChinese(prev - 1));
         vibrateLight();
         return prev - 1;
       });
@@ -435,12 +435,21 @@ export default function TrainingRunScreen() {
 
   function speak(text: string, rate: number = 1.0) {
     Speech.stop();
+    speakImpl(text);
+    void rate;
+  }
+
+  // v0.25 用于"连续数字朗读"场景（倒数、次数报点、节拍）：
+  // 不调 Speech.stop()，让 TTS 按顺序排队朗读，避免每秒切断前一个字导致的"机器人单字感"。
+  function speakRaw(text: string) {
+    speakImpl(text);
+  }
+
+  function speakImpl(text: string) {
     const spoken = toChinesePronunciation(text);
-    // 调用方相对节奏 × 用户全局 rate（如 1.5 × 0.9 = 1.35）
-    const finalRate = rate * ttsRateRef.current;
     const opts: Speech.SpeechOptions = {
       ...SPEECH_BASE_OPTIONS,
-      rate: finalRate,
+      rate: ttsRateRef.current,
       pitch: ttsPitchRef.current,
     };
     if (zhVoiceRef.current) opts.voice = zhVoiceRef.current;
@@ -480,8 +489,8 @@ export default function TrainingRunScreen() {
           if (t % repTime === 0) {
             const rep = Math.floor(t / repTime) + 1;
             if (rep <= reps) {
-              // v0.24 次数报点 rate 从 1.5 → 1.1 防"赶"
-              speak(rep.toString(), 1.1);
+              // v0.25 次数报点用 speakRaw 不打断，TTS 队列衔接更自然
+              speakRaw(rep.toString());
               if (item.category === 'tech' || item.category === 'match') playHit();
               if (item.category === 'footwork') playSqueak();
             }
@@ -490,7 +499,7 @@ export default function TrainingRunScreen() {
         } else {
           // 休息期：倒计时
           const restLeft = cycleTime - t;
-          if (restLeft <= 3 && restLeft > 0) speak(restLeft.toString(), 1.0);
+          if (restLeft <= 3 && restLeft > 0) speakRaw(restLeft.toString());
         }
         return; // 被精细正则接管后，跳过兜底逻辑
       }
@@ -514,7 +523,7 @@ export default function TrainingRunScreen() {
           // 工作期
           const workLeft = workSec - t;
           if (workLeft === Math.floor(workSec / 2)) speak('过半了，坚持住');
-          if (workLeft <= 3 && workLeft > 0) speak(workLeft.toString(), 1.0);
+          if (workLeft <= 3 && workLeft > 0) speakRaw(workLeft.toString());
           if (workLeft === 1) setTimeout(() => speak('好，休息三十秒'), 1500);
           
           // 在时间组内，如果是步法，继续播报随机点
@@ -531,7 +540,7 @@ export default function TrainingRunScreen() {
           // 休息期
           const restLeft = cycleTime - t;
           if (restLeft === 10) speak('准备下一组');
-          if (restLeft <= 3 && restLeft > 0) speak(restLeft.toString(), 1.0);
+          if (restLeft <= 3 && restLeft > 0) speakRaw(restLeft.toString());
         }
         return;
       }
@@ -552,7 +561,7 @@ export default function TrainingRunScreen() {
     } else if (item.category === 'tech') {
       if (timeLeftSec % 3 === 0) {
         const beat = Math.floor(elapsed / 3) % 4 + 1;
-        speak(beat.toString(), 1.1);
+        speakRaw(beat.toString());
         playHit();
       } else if (timeLeftSec % 20 === 0) {
         const pts = ['注意动作完整', '体会发力', '回中要快', '盯住球'];
