@@ -109,6 +109,24 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.27.0 · 2026-05-17
+
+- **产品需求**：录像复盘详情页 `app/replay/[id].tsx` 升级为"快速标注台"（预设 chip、视频自动暂停、时间微调胶囊、删除二次确认、空态引导卡）。
+- **开发改动**：
+  - `app/replay/[id].tsx`：
+    - 新增 7 个预设高频标签 `PRESET_TAGS`，chip 点击写入 `tag` 并自动 `pauseAsync` 暂停视频。
+    - 新增时间微调胶囊（◀ -3s / +3s ▶），基于 `duration` 和 `position` 做 clamp 下上界收拢防越界。
+    - 标注列表序号左侧显示且应用 `tabular-nums` 等宽字体（如 `#01`）；列表为空时展示虚线引导空态卡。
+    - 列表长按删除增加跨端二次确认（Web 走 `window.confirm`，原生走 `Alert.alert`）。
+  - `package.json`：版本号提升到 `0.27.0`。
+- **测试结论**：
+  - ✅ PRESET_TAGS 生成 7 个 chip，点击更新 tag 并兜底暂停视频。
+  - ✅ ±3s 胶囊按 clamp 逻辑控制时间推移。
+  - ✅ `tabular-nums` 字体变体正确挂载。
+  - ✅ 删除二次确认完美区分 `Platform.OS` 跨端支持。
+  - ✅ 虚线空态卡及提示文本符合视觉与交互逻辑。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.26.0 · 2026-05-16
 
 - **Bug 报告**：用户反馈"今天感觉怎么样？"下方三个状态按钮（💪满血/⚡一般/🪫疲惫）**看不见**。
