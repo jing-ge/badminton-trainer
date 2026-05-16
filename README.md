@@ -109,6 +109,36 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.24.0 · 2026-05-16
+
+- **产品需求**：v0.23.0 语音改进后用户反馈仍呆滞、不够自然。Android 系统 TTS 引擎质量参差，且我们写死了 pitch 0.95、对高 rate 做 ×0.85 衰减——其实**这两个都是错的方向**：用户需要的是**自己选 voice + 自己调参数**，因为不同 Android 设备的"最佳 voice"完全不同。
+- **开发改动**：
+  - 新增 `app/settings/voice.tsx`「语音设置」页：
+    - 列出系统所有 zh-* voice（排除 zh-TW / zh-HK），每个支持「试听」+「单选 + 持久化」（key `prefs.ttsVoice`）
+    - 顶部「系统默认」选项可清除选择回退到自动挑选
+    - 语速 / 音调 ± 微调按钮（0.5 - 2.0 范围，step 0.1），改动后自动试听
+    - 试听文本 `"准备开始训练，五，四，三，二，一"` —— 同时覆盖数字 + 节奏 + 语调三个场景
+    - 底部提示卡：装不到普通话 voice 时引导用户去系统设置装"中文（中国）"包
+    - 试听 / 选择都 vibrateLight 即时反馈
+    - 名字识别：含 tingting / siri / enhanced / premium 的 voice 加中文注释
+  - `app/(tabs)/me.tsx`：「日程提醒」下方插入「🔊 语音设置」入口
+  - `app/training/run.tsx`：
+    - 挂载 effect 改造：先读 `prefs.ttsVoice / ttsRate / ttsPitch`，验证 voice 还在系统列表里再用；失效或没选过则 fallback 到自动挑 zh-CN
+    - `speak()` 内部：用 `ttsRateRef × 调用方 rate` 作为最终 rate，`ttsPitchRef` 作为 pitch（不再写死 0.95）
+    - 移除 v0.23 的"高 rate × 0.85"衰减——改由用户全局 rate 控制
+    - 倒数 5/4/3/2/1 从 rate 1.5 降到 1.0，且用 `numToChinese(prev-1)` 显式转汉字
+    - 准备期最后一秒新增 `"开始"` 语音（替代原本"静默切到 running"）
+    - 次数报点（行 483 `rep.toString()`、行 555 `beat.toString()`）rate 从 1.5 → 1.1，更接近真实教练节奏
+    - 倒数 3 秒（行 492、516、533）rate 从 1.5 → 1.0
+- **测试结论**：
+  - ✅ tsc --noEmit 通过
+  - ✅ 语音设置页：voice 列表 / 试听 / 选择持久化 / 语速音调 ± / 自动试听
+  - ✅ run.tsx 优先用户偏好；voice id 失效时安全 fallback
+  - ✅ 倒数节奏从"赶"恢复到自然
+  - ✅ 未触碰：其它任何 Tab / 组件
+  - ✅ 未引入新 npm 包
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.23.0 · 2026-05-16
 
 - **产品需求**：训练语音呆滞 + 数字"3"特别难听 → 强制普通话发音 + 数字转汉字播报。

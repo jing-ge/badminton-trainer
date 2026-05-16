@@ -41,8 +41,8 @@ function toChinesePronunciation(text: string): string {
     return n >= 0 && n <= 99 ? numToChinese(n) : m;
   });
 }
-// 普通话语音参数：pitch 略低 0.95 听感更稳；rate 由调用方传
-const SPEECH_BASE_OPTIONS = { language: 'zh-CN', pitch: 0.95 };
+// 普通话语音参数：pitch / rate 默认 1.0（v0.24 用户可在「我的→语音设置」自定义覆盖）
+const SPEECH_BASE_OPTIONS = { language: 'zh-CN' };
 
 const CATEGORY_EMOJI: Record<string, string> = {
   tech: '🏸',
@@ -121,16 +121,41 @@ export default function TrainingRunScreen() {
   const sfxHitRef = useRef<Audio.Sound | null>(null);
   const sfxSqueakRef = useRef<Audio.Sound | null>(null);
 
-  // v0.23 普通话 voice 选择：挂载时拉一次系统可用 voice，挑一个 zh-CN 的固定下来
-  // 防止某些设备默认 fallback 到英文 voice 把 "三" 读成 "three" 或语调走调
+  // v0.23 / v0.24 普通话 voice 选择 + 用户自定义参数
+  // 1. 优先用户在「设置 → 语音」选定的 voice / rate / pitch（持久化在 AsyncStorage）
+  // 2. 用户没选过则自动挑 zh-CN，排除 zh-TW / zh-HK
   const zhVoiceRef = useRef<string | undefined>(undefined);
+  const ttsRateRef = useRef<number>(1.0);
+  const ttsPitchRef = useRef<number>(1.0);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const voices = await Speech.getAvailableVoicesAsync();
+        // 先读用户偏好（含 voice / rate / pitch）
+        const [savedVoice, savedRate, savedPitch, voices] = await Promise.all([
+          AsyncStorage.getItem('prefs.ttsVoice'),
+          AsyncStorage.getItem('prefs.ttsRate'),
+          AsyncStorage.getItem('prefs.ttsPitch'),
+          Speech.getAvailableVoicesAsync(),
+        ]);
         if (cancelled) return;
-        // 优先级：zh-CN > zh-Hans > zh（不要 zh-TW / zh-HK，避免粤语腔）
+
+        if (savedRate) {
+          const r = parseFloat(savedRate);
+          if (!isNaN(r) && r > 0) ttsRateRef.current = r;
+        }
+        if (savedPitch) {
+          const p = parseFloat(savedPitch);
+          if (!isNaN(p) && p > 0) ttsPitchRef.current = p;
+        }
+
+        // 验证用户选的 voice 还在列表里（系统升级可能让 id 失效）
+        if (savedVoice && voices.some((v) => v.identifier === savedVoice)) {
+          zhVoiceRef.current = savedVoice;
+          return;
+        }
+
+        // fallback：优先级 zh-CN > zh-Hans > zh-*（排除 zh-TW / zh-HK）
         const pick =
           voices.find((v) => v.language === 'zh-CN') ??
           voices.find((v) => v.language === 'zh-Hans') ??
@@ -139,11 +164,12 @@ export default function TrainingRunScreen() {
                              !v.language.toLowerCase().includes('hk'));
         if (pick) zhVoiceRef.current = pick.identifier;
       } catch {
-        // 静默：拿不到 voice 列表就走系统默认（speak 仍会用 language: 'zh-CN' 兜底）
+        // 静默：拿不到就走系统默认，speak 仍带 language: 'zh-CN' 兜底
       }
     })();
     return () => { cancelled = true; };
   }, []);
+
 
   // 预加载音效
   useEffect(() => {
@@ -324,9 +350,11 @@ export default function TrainingRunScreen() {
           stopTimer();
           setStatus('running');
           vibrateMedium();
+          speak('开始', 1.0);
           return 0;
         }
-        speak(String(prev - 1), 1.5);
+        // v0.24 倒数自然化：rate 1.0 让 TTS 有完整音节展开；用汉字直读，避免数字识别歧义
+        speak(numToChinese(prev - 1), 1.0);
         vibrateLight();
         return prev - 1;
       });
@@ -408,11 +436,12 @@ export default function TrainingRunScreen() {
   function speak(text: string, rate: number = 1.0) {
     Speech.stop();
     const spoken = toChinesePronunciation(text);
-    // 微降 rate 让语音不那么"赶"，呆滞感来自单字 + 高 rate 组合
-    const adjRate = rate >= 1.4 ? rate * 0.85 : rate;
+    // 调用方相对节奏 × 用户全局 rate（如 1.5 × 0.9 = 1.35）
+    const finalRate = rate * ttsRateRef.current;
     const opts: Speech.SpeechOptions = {
       ...SPEECH_BASE_OPTIONS,
-      rate: adjRate,
+      rate: finalRate,
+      pitch: ttsPitchRef.current,
     };
     if (zhVoiceRef.current) opts.voice = zhVoiceRef.current;
     Speech.speak(spoken, opts);
@@ -451,7 +480,8 @@ export default function TrainingRunScreen() {
           if (t % repTime === 0) {
             const rep = Math.floor(t / repTime) + 1;
             if (rep <= reps) {
-              speak(rep.toString(), 1.5);
+              // v0.24 次数报点 rate 从 1.5 → 1.1 防"赶"
+              speak(rep.toString(), 1.1);
               if (item.category === 'tech' || item.category === 'match') playHit();
               if (item.category === 'footwork') playSqueak();
             }
@@ -460,7 +490,7 @@ export default function TrainingRunScreen() {
         } else {
           // 休息期：倒计时
           const restLeft = cycleTime - t;
-          if (restLeft <= 3 && restLeft > 0) speak(restLeft.toString(), 1.5);
+          if (restLeft <= 3 && restLeft > 0) speak(restLeft.toString(), 1.0);
         }
         return; // 被精细正则接管后，跳过兜底逻辑
       }
@@ -484,7 +514,7 @@ export default function TrainingRunScreen() {
           // 工作期
           const workLeft = workSec - t;
           if (workLeft === Math.floor(workSec / 2)) speak('过半了，坚持住');
-          if (workLeft <= 3 && workLeft > 0) speak(workLeft.toString(), 1.5);
+          if (workLeft <= 3 && workLeft > 0) speak(workLeft.toString(), 1.0);
           if (workLeft === 1) setTimeout(() => speak('好，休息三十秒'), 1500);
           
           // 在时间组内，如果是步法，继续播报随机点
@@ -501,7 +531,7 @@ export default function TrainingRunScreen() {
           // 休息期
           const restLeft = cycleTime - t;
           if (restLeft === 10) speak('准备下一组');
-          if (restLeft <= 3 && restLeft > 0) speak(restLeft.toString(), 1.5);
+          if (restLeft <= 3 && restLeft > 0) speak(restLeft.toString(), 1.0);
         }
         return;
       }
@@ -522,7 +552,7 @@ export default function TrainingRunScreen() {
     } else if (item.category === 'tech') {
       if (timeLeftSec % 3 === 0) {
         const beat = Math.floor(elapsed / 3) % 4 + 1;
-        speak(beat.toString(), 1.5);
+        speak(beat.toString(), 1.1);
         playHit();
       } else if (timeLeftSec % 20 === 0) {
         const pts = ['注意动作完整', '体会发力', '回中要快', '盯住球'];
@@ -558,7 +588,7 @@ export default function TrainingRunScreen() {
     setTimeout(() => {
       setPrepTime(5);
       setStatus('preparing');
-      setTimeout(() => { speak('5'); vibrateLight(); }, 1000);
+      setTimeout(() => { speak('五', 1.0); vibrateLight(); }, 1000);
     }, isFirst ? 2000 : 3500); 
   }
 
