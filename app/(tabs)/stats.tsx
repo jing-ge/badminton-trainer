@@ -125,7 +125,42 @@ export default function StatsScreen() {
   const last28Days = last28.filter((d) => d.mins > 0).length;
   const acReady = last28Total >= 60 && last28Days >= 3 && chronicLoad > 0;
   const acRatio = acReady ? (acuteLoad / chronicLoad).toFixed(2) : '—';
+  const acRatioNum = acReady ? Number(acRatio) : null;
   const isHighRisk = acReady && Number(acRatio) > 1.5;
+
+  // v0.18.0 — 私教信号灯：4 档语义 + 副标题动态文案 + 数值色
+  // 不足 < 0.8 / 理想 0.8-1.3 / 偏高 1.3-1.5 / 高危 > 1.5
+  const acZone: 'low' | 'ok' | 'high' | 'danger' | 'pending' = !acReady
+    ? 'pending'
+    : acRatioNum! < 0.8
+    ? 'low'
+    : acRatioNum! <= 1.3
+    ? 'ok'
+    : acRatioNum! <= 1.5
+    ? 'high'
+    : 'danger';
+  const acHint =
+    acZone === 'pending'
+      ? '累计 3 天 / 60 分钟训练后，开始为你监测受伤风险'
+      : acZone === 'low'
+      ? '最近练得偏少，状态可能有点凉'
+      : acZone === 'ok'
+      ? '节奏稳定，处于最佳训练区间'
+      : acZone === 'high'
+      ? '训练强度上来了，注意收着练'
+      : '训练量激增，拉伤/劳损风险极高';
+  const acValueColor =
+    acZone === 'pending'
+      ? colors.textDim
+      : acZone === 'low'
+      ? colors.textDim
+      : acZone === 'ok'
+      ? colors.primary
+      : acZone === 'high'
+      ? colors.warn
+      : colors.danger;
+  // 信号灯条：游标位置 = min(ratio, 2.0) / 2.0；4 段宽度 35/30/20/15
+  const acCursorPct = acRatioNum !== null ? Math.min(Math.max(acRatioNum, 0), 2.0) / 2.0 : 0;
 
   // 最近 30 天训练类别分布
   const categoryStats = useMemo(() => {
@@ -213,16 +248,14 @@ export default function StatsScreen() {
       <Card style={{ marginBottom: spacing.lg, borderColor: isHighRisk ? colors.danger : colors.border }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View style={{ flex: 1, paddingRight: spacing.md }}>
-            <Text style={{ color: colors.text, fontWeight: '700', fontSize: font.h3 }}>运动伤病预警 (A:C 比值)</Text>
+            <Text style={{ color: colors.text, fontWeight: '700', fontSize: font.h3 }}>🚦 训练负荷信号灯</Text>
             <Text style={{ color: colors.textDim, fontSize: font.small, marginTop: 4 }}>
-              {acReady
-                ? '近7天负荷 / 近28天平均负荷 (安全区间 0.8-1.3)'
-                : '数据样本不足，至少累计 3 天 / 60 分钟训练后开始监测'}
+              {acHint}
             </Text>
           </View>
           <Text
             style={{
-              color: !acReady ? colors.textDim : isHighRisk ? colors.danger : colors.primary,
+              color: acValueColor,
               fontSize: 32,
               fontWeight: '800',
             }}
@@ -230,9 +263,43 @@ export default function StatsScreen() {
             {acRatio}
           </Text>
         </View>
+
+        {/* v0.18 信号灯条：4 段语义色 + 游标三角 */}
+        <View style={{ marginTop: spacing.md, opacity: acZone === 'pending' ? 0.3 : 1 }}>
+          {acZone !== 'pending' && (
+            <View style={{ height: 10, position: 'relative', marginBottom: 2 }}>
+              <Text
+                style={{
+                  position: 'absolute',
+                  left: `${acCursorPct * 100}%`,
+                  marginLeft: -6,
+                  color: colors.text,
+                  fontSize: 10,
+                  lineHeight: 10,
+                }}
+              >
+                ▼
+              </Text>
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden' }}>
+            <View style={{ flex: 35, backgroundColor: colors.textDim }} />
+            <View style={{ flex: 30, backgroundColor: colors.primary }} />
+            <View style={{ flex: 20, backgroundColor: colors.warn }} />
+            <View style={{ flex: 15, backgroundColor: colors.danger }} />
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+            <Text style={{ color: colors.textDim, fontSize: font.tiny }}>0</Text>
+            <Text style={{ color: colors.textDim, fontSize: font.tiny }}>0.8</Text>
+            <Text style={{ color: colors.textDim, fontSize: font.tiny }}>1.3</Text>
+            <Text style={{ color: colors.textDim, fontSize: font.tiny }}>1.5</Text>
+            <Text style={{ color: colors.textDim, fontSize: font.tiny }}>2.0+</Text>
+          </View>
+        </View>
+
         {isHighRisk && (
           <Text style={{ color: colors.danger, fontSize: font.small, marginTop: spacing.md }}>
-            ⚠️ 警告：你最近一周的训练量增加过快，拉伤或劳损的风险极高！建议这周加入更多"恢复"项。
+            🔥 建议本周减量并增加恢复项，给身体一个缓冲。
           </Text>
         )}
       </Card>
