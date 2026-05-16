@@ -109,6 +109,28 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.20.0 · 2026-05-15
+
+- **产品需求**：「训练」Tab 整体打磨——周历模式今日卡情绪化（"今天 · 周X" 徽章 + 模块行 ▶ 箭头 + "开始练 →" CTA）+ 休息日文案区分（周末 🏖 / 工作日 ⏸）+ random/pool 模式顶部 hero 卡 + 移除 AI 动作识别入口（用户硬约束）。
+- **开发改动**：
+  - `app/(tabs)/train.tsx`：
+    - WeeklyView 今日卡：背景换 cardAlt + 顶部 `今天 · 周X` primary 徽章 + 模块名右侧 ▶ primary 箭头 + 底部 `🚀 开始练 →` 或 `去做个 10 分钟拉伸 →`（按是否有模块切换 primary/accent）
+    - 休息日文案：周末（wd=0/6）`🏖 周末休息日`，工作日 `⏸ 还没安排训练`
+    - RandomView 顶部 hero 卡：`🎲 今日随机` h2 + `每天从 N 个模块里抽 K 个练`，accent 描边
+    - PoolView 顶部 hero 卡：`🎯 自由模块池` h2 + `点哪个练哪个，按心情来`，warn 描边
+    - 删除「🎥 动作识别 / 实时纠错」入口（v0.5 起 pose 占位已冻结，用户多次强调不碰 AI）
+    - 模块 Pressable 加 pressed opacity 0.7
+    - 新增 styles：todayBadge / todayBadgeText / modArrow / todayCtaBtn / todayCtaText / modeHeroTitle / modeHeroSub
+- **测试结论**：
+  - ✅ tsc --noEmit 通过
+  - ✅ 今日卡 isToday 视觉差异完整（背景/徽章/箭头/底部 CTA）
+  - ✅ 休息日 weekend/weekday 双态文案区分
+  - ✅ random/pool hero 卡边框色对应 accent/warn，与 weekly 主色 primary 三态分明
+  - ✅ AI 入口已从训练 Tab 移除（pose 路由仍保留，只是不再从这入口暴露）
+  - ✅ 未触碰：run.tsx 任何代码、首页、tutorial、me、stats、plans、agent prompt 文件
+  - ✅ 未引入新 npm 包
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.19.0 · 2026-05-15
 
 - **产品需求**：首页「今日训练卡」从「文字列表」升级为「私教任务卡」——source 标签视觉差异化、巨型双栏数字（训练项/分钟）、模块行加 emoji 与时长、按钮加 🚀；同时修 recent intensity 异常值兜底。

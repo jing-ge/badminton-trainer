@@ -60,7 +60,13 @@ export default function TrainScreen() {
       </View>
 
       {plan.mode === 'weekly' ? (
-        <WeeklyView plan={plan} today={today} onTapModule={(m) => router.push(`/training/module/${m.id}`)} />
+        <WeeklyView
+          plan={plan}
+          today={today}
+          onTapModule={(m) => router.push(`/training/module/${m.id}`)}
+          onStartToday={() => router.push('/training/today')}
+          onRecovery={() => router.push('/training/fitness')}
+        />
       ) : plan.mode === 'random' ? (
         <RandomView plan={plan} onTapModule={(m) => router.push(`/training/module/${m.id}`)} onGo={() => router.push('/training/today')} />
       ) : (
@@ -85,15 +91,6 @@ export default function TrainScreen() {
             <Text style={styles.focus}>爆发力、核心、耐力 · 计时器辅助</Text>
           </Card>
         </Pressable>
-        <Pressable
-          onPress={() => router.push('/pose')}
-          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, marginTop: spacing.md }]}
-        >
-          <Card>
-            <Text style={styles.planTitle}>🎥 动作识别 / 实时纠错</Text>
-            <Text style={styles.focus}>对着摄像头练习，AI 给你打分</Text>
-          </Card>
-        </Pressable>
       </Section>
     </Screen>
   );
@@ -103,16 +100,21 @@ function WeeklyView({
   plan,
   today,
   onTapModule,
+  onStartToday,
+  onRecovery,
 }: {
   plan: Plan;
   today: number;
   onTapModule: (m: TrainingModule) => void;
+  onStartToday: () => void;
+  onRecovery: () => void;
 }) {
   return (
     <View style={{ marginTop: spacing.md }}>
       {[1, 2, 3, 4, 5, 6, 0].map((wd) => {
         const mods = plan.modules.filter((m) => m.weekday === wd);
         const isToday = wd === today;
+        const isWeekend = wd === 0 || wd === 6;
         const total = mods.reduce((a, m) => a + m.items.reduce((x, y) => x + y.duration_min, 0), 0);
         return (
           <Card
@@ -121,8 +123,14 @@ function WeeklyView({
               marginBottom: spacing.md,
               borderColor: isToday ? colors.primary : colors.border,
               borderWidth: isToday ? 2 : 1,
+              backgroundColor: isToday ? colors.cardAlt : colors.card,
             }}
           >
+            {isToday && (
+              <View style={styles.todayBadge}>
+                <Text style={styles.todayBadgeText}>今天 · 周{WEEK_LABELS[wd]}</Text>
+              </View>
+            )}
             <View style={styles.row}>
               <View style={[styles.dayBadge, isToday && { backgroundColor: colors.primary }]}>
                 <Text style={[styles.dayBadgeText, isToday && { color: '#fff' }]}>
@@ -131,12 +139,14 @@ function WeeklyView({
               </View>
               <View style={{ flex: 1, marginLeft: spacing.md }}>
                 {mods.length === 0 ? (
-                  <Text style={styles.restDay}>休息 / 未安排</Text>
+                  <Text style={styles.restDay}>
+                    {isWeekend ? '🏖 周末休息日' : '⏸ 还没安排训练'}
+                  </Text>
                 ) : (
                   mods.map((m) => (
-                    <Pressable key={m.id} onPress={() => onTapModule(m)}>
+                    <Pressable key={m.id} onPress={() => onTapModule(m)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
                       <Text style={styles.modName}>
-                        {CATEGORY_META[m.category].emoji} {m.name}
+                        {CATEGORY_META[m.category].emoji} {m.name} <Text style={styles.modArrow}>▶</Text>
                       </Text>
                       <Text style={styles.modFocus}>{m.focus}</Text>
                     </Pressable>
@@ -149,6 +159,16 @@ function WeeklyView({
                 )}
               </View>
             </View>
+            {isToday && mods.length > 0 && (
+              <Pressable onPress={onStartToday} style={styles.todayCtaBtn}>
+                <Text style={styles.todayCtaText}>🚀 开始练 →</Text>
+              </Pressable>
+            )}
+            {isToday && mods.length === 0 && (
+              <Pressable onPress={onRecovery} style={[styles.todayCtaBtn, { backgroundColor: colors.accent }]}>
+                <Text style={styles.todayCtaText}>去做个 10 分钟拉伸 →</Text>
+              </Pressable>
+            )}
           </Card>
         );
       })}
@@ -167,9 +187,10 @@ function RandomView({
 }) {
   return (
     <View style={{ marginTop: spacing.md }}>
-      <Card style={{ marginBottom: spacing.md }}>
-        <Text style={styles.randomHint}>
-          🎲 每日随机抽 {plan.random_pick ?? 3} 个模块组合训练
+      <Card style={{ marginBottom: spacing.md, borderColor: colors.accent, borderWidth: 1, backgroundColor: colors.cardAlt }}>
+        <Text style={styles.modeHeroTitle}>🎲 今日随机</Text>
+        <Text style={styles.modeHeroSub}>
+          每天从 {plan.modules.length} 个模块里抽 {plan.random_pick ?? 3} 个练
         </Text>
         <Pressable onPress={onGo} style={styles.goBtn}>
           <Text style={styles.goBtnText}>查看今日组合 →</Text>
@@ -177,7 +198,7 @@ function RandomView({
       </Card>
       <Text style={styles.sectionTitle}>模块库（{plan.modules.length}）</Text>
       {plan.modules.map((m) => (
-        <Pressable key={m.id} onPress={() => onTapModule(m)}>
+        <Pressable key={m.id} onPress={() => onTapModule(m)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
           <Card style={{ marginBottom: spacing.sm }}>
             <Text style={styles.modName}>
               {CATEGORY_META[m.category].emoji} {m.name}
@@ -201,9 +222,13 @@ function PoolView({
 }) {
   return (
     <View style={{ marginTop: spacing.md }}>
+      <Card style={{ marginBottom: spacing.md, borderColor: colors.warn, borderWidth: 1, backgroundColor: colors.cardAlt }}>
+        <Text style={styles.modeHeroTitle}>🎯 自由模块池</Text>
+        <Text style={styles.modeHeroSub}>点哪个练哪个，按心情来</Text>
+      </Card>
       <Text style={styles.sectionTitle}>训练模块池（{plan.modules.length}）</Text>
       {plan.modules.map((m) => (
-        <Pressable key={m.id} onPress={() => onTapModule(m)}>
+        <Pressable key={m.id} onPress={() => onTapModule(m)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
           <Card style={{ marginBottom: spacing.sm }}>
             <Text style={styles.modName}>
               {CATEGORY_META[m.category].emoji} {m.name}
@@ -261,4 +286,25 @@ const styles = StyleSheet.create({
   },
   goBtnText: { color: '#fff', fontWeight: '700' },
   editBtn: { color: colors.primary, textAlign: 'center', fontWeight: '600' },
+  // v0.20 新增
+  todayBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    marginBottom: spacing.sm,
+  },
+  todayBadgeText: { color: '#fff', fontSize: font.tiny, fontWeight: '700' },
+  modArrow: { color: colors.primary, fontSize: font.tiny },
+  todayCtaBtn: {
+    marginTop: spacing.md,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  todayCtaText: { color: '#fff', fontWeight: '700', fontSize: font.body },
+  modeHeroTitle: { color: colors.text, fontSize: font.h2, fontWeight: '800' },
+  modeHeroSub: { color: colors.textDim, fontSize: font.small, marginTop: 4 },
 });
