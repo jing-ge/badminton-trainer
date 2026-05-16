@@ -21,6 +21,15 @@ import {
 } from '@/features/streak/StreakBadgeCard';
 import { MilestoneToast } from '@/features/streak/MilestoneToast';
 
+// v0.19.0 — 模块 category emoji（与 PlanCard inline 字典语义对齐）
+const MOD_EMOJI: Record<string, string> = {
+  tech: '🏸',
+  footwork: '👟',
+  fitness: '💪',
+  match: '⚔️',
+  recovery: '🧘',
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const [today, setToday] = useState<TodaySelection | null>(null);
@@ -200,27 +209,47 @@ export default function HomeScreen() {
           ) : (
             <>
               <Card>
-                <Text style={styles.planName}>{today.plan.name}</Text>
-                <Text style={styles.planMode}>
-                  {today.source === 'weekly'
-                    ? '周计划'
-                    : today.source === 'random'
-                      ? `🎲 今日随机 ${today.modules.length} 模块`
-                      : '模块池'}
-                </Text>
-                <Text style={styles.planMeta}>
-                  {itemCount} 个训练项 · 约 {totalMin} 分钟
-                </Text>
-                {today.modules.slice(0, 3).map((m) => (
-                  <Text key={m.id} style={styles.modItem} numberOfLines={1}>
-                    · {m.name}
+                {/* v0.19 顶部 source 标签行 */}
+                <View style={styles.sourceRow}>
+                  <Text style={[styles.sourceLabel, sourceStyle(today.source)]}>
+                    {sourceEmoji(today.source)} {sourceText(today.source, today.modules.length)}
                   </Text>
-                ))}
-                {today.modules.length > 3 && (
-                  <Text style={styles.modItem}>... 共 {today.modules.length} 个模块</Text>
-                )}
+                </View>
+                <Text style={styles.planName}>{today.plan.name}</Text>
+
+                {/* v0.19 巨型双栏数字：本节练几项 / 共多少分钟 */}
+                <View style={styles.statsRow}>
+                  <View style={styles.statCol}>
+                    <Text style={styles.statNum}>{itemCount}</Text>
+                    <Text style={styles.statLabel}>训练项</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statCol}>
+                    <Text style={styles.statNum}>{totalMin}</Text>
+                    <Text style={styles.statLabel}>分钟</Text>
+                  </View>
+                </View>
+
+                {/* v0.19 模块行：emoji + 名称 + 时长 */}
+                <View style={{ marginTop: spacing.sm }}>
+                  {today.modules.slice(0, 3).map((m) => {
+                    const mins = m.items.reduce((a, b) => a + b.duration_min, 0);
+                    const emoji = MOD_EMOJI[m.category] ?? '🎯';
+                    return (
+                      <View key={m.id} style={styles.modRow}>
+                        <Text style={styles.modEmoji}>{emoji}</Text>
+                        <Text style={styles.modName} numberOfLines={1}>{m.name}</Text>
+                        <Text style={styles.modMins}>{mins} 分钟</Text>
+                      </View>
+                    );
+                  })}
+                  {today.modules.length > 3 && (
+                    <Text style={styles.modMore}>... 共 {today.modules.length} 个模块</Text>
+                  )}
+                </View>
+
                 <Button
-                  title="开始今日训练"
+                  title="🚀 开始今日训练"
                   onPress={() => router.push('/training/today')}
                   style={{ marginTop: spacing.md }}
                 />
@@ -249,22 +278,25 @@ export default function HomeScreen() {
 
       {recent.length > 0 && (
         <Section title="最近训练">
-          {recent.map((r) => (
-            <Card key={r.id} style={{ marginBottom: spacing.sm }}>
-              <View style={styles.recentRow}>
-                <View>
-                  <Text style={styles.recentDate}>{r.date}</Text>
-                  <Text style={styles.recentMeta}>
-                    {r.duration_min} 分钟 · {r.categories.join('、') || '综合'}
+          {recent.map((r) => {
+            const stars = Math.max(0, Math.min(5, r.intensity));
+            return (
+              <Card key={r.id} style={{ marginBottom: spacing.sm }}>
+                <View style={styles.recentRow}>
+                  <View>
+                    <Text style={styles.recentDate}>{r.date}</Text>
+                    <Text style={styles.recentMeta}>
+                      {r.duration_min} 分钟 · {r.categories.join('、') || '综合'}
+                    </Text>
+                  </View>
+                  <Text style={styles.intensity}>
+                    {'★'.repeat(stars)}
+                    {'☆'.repeat(5 - stars)}
                   </Text>
                 </View>
-                <Text style={styles.intensity}>
-                  {'★'.repeat(r.intensity)}
-                  {'☆'.repeat(5 - r.intensity)}
-                </Text>
-              </View>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </Section>
       )}
     </Screen>
@@ -289,6 +321,19 @@ function QuickCard({
       <Text style={styles.quickDesc}>{desc}</Text>
     </Pressable>
   );
+}
+
+// v0.19 source 标签：emoji / 文案 / 主色
+function sourceEmoji(s: TodaySelection['source']) {
+  return s === 'weekly' ? '🗓' : s === 'random' ? '🎲' : '🎯';
+}
+function sourceText(s: TodaySelection['source'], n: number) {
+  return s === 'weekly' ? '周计划' : s === 'random' ? `今日随机 ${n} 模块` : '模块池';
+}
+function sourceStyle(s: TodaySelection['source']) {
+  return {
+    color: s === 'weekly' ? colors.primary : s === 'random' ? colors.accent : colors.warn,
+  };
 }
 
 function getGreeting() {
@@ -341,4 +386,24 @@ const styles = StyleSheet.create({
   recentDate: { color: colors.text, fontWeight: '600' },
   recentMeta: { color: colors.textDim, fontSize: font.small, marginTop: 2 },
   intensity: { color: colors.warn, fontSize: 14 },
+  // v0.19 今日训练卡新样式
+  sourceRow: { marginBottom: 6 },
+  sourceLabel: { fontSize: font.small, fontWeight: '700' },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.cardAlt,
+    borderRadius: radius.md,
+  },
+  statCol: { flex: 1, alignItems: 'center' },
+  statNum: { color: colors.primary, fontSize: font.h2, fontWeight: '800' },
+  statLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 2 },
+  statDivider: { width: 1, height: 28, backgroundColor: colors.border },
+  modRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, gap: spacing.sm },
+  modEmoji: { fontSize: 16 },
+  modName: { flex: 1, color: colors.text, fontSize: font.small },
+  modMins: { color: colors.textDim, fontSize: font.tiny },
+  modMore: { color: colors.textDim, fontSize: font.tiny, marginTop: spacing.sm, fontStyle: 'italic' },
 });

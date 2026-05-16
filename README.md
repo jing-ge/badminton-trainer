@@ -109,6 +109,27 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.19.0 · 2026-05-15
+
+- **产品需求**：首页「今日训练卡」从「文字列表」升级为「私教任务卡」——source 标签视觉差异化、巨型双栏数字（训练项/分钟）、模块行加 emoji 与时长、按钮加 🚀；同时修 recent intensity 异常值兜底。
+- **开发改动**：
+  - `app/(tabs)/index.tsx`：
+    - inline `MOD_EMOJI`（tech🏸/footwork👟/fitness💪/match⚔️/recovery🧘）
+    - 新增 `sourceEmoji / sourceText / sourceStyle` 三函数：weekly→🗓 primary / random→🎲 accent / pool→🎯 warn
+    - 今日训练卡重排：顶部 source 标签 → plan name → 巨型双栏（itemCount/totalMin，primary h2 800）→ 模块行（emoji+名称+时长）→ 「🚀 开始今日训练」按钮
+    - 模块行右侧时长用 `Math.max(1, Math.round(it.duration_min))` 等价的 `m.items.reduce` 求和
+    - 最近训练 intensity 渲染加 `Math.max(0, Math.min(5, r.intensity))` 钳制（防异常数据）
+    - 新增 styles：sourceRow / sourceLabel / statsRow / statCol / statNum / statLabel / statDivider / modRow / modEmoji / modName / modMins / modMore
+- **测试结论**：
+  - ✅ tsc --noEmit 通过
+  - ✅ 3 种 source 颜色映射正确（primary/accent/warn）
+  - ✅ 巨型双栏：左 itemCount / 右 totalMin，中间 1px border 分隔
+  - ✅ 模块行 emoji 按 module.category 派生，fallback 🎯
+  - ✅ intensity 钳制：负数 → 0 ☆☆☆☆☆；>5 → 5 ★★★★★
+  - ✅ 未触碰：StreakBadgeCard / MilestoneToast / 欢迎卡 / 回归卡 / 快捷入口 / 最近训练卡片样式 / 其它任何 Tab
+  - ✅ 未引入新 npm 包
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.18.0 · 2026-05-15
 
 - **产品需求**：stats 中部的 A:C 比值卡从「专业术语警示」升级为「私教式负荷信号灯」——4 档语义化文案 + 横向信号灯条 + 游标指示当前位置 + 警示语气克制化。
