@@ -22,6 +22,29 @@ const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 const HISTORY_INITIAL = 20;
 
+// 历史区筛选 Pill 类型
+type HistoryFilter = 'all' | 'training' | 'match' | 'high' | 'note';
+
+// 强度档位元信息(emoji + 2 字标签):语义对齐 /log/[id] 的 INTENSITY_LABEL,
+// 不直接 import 私有常量,这里内联保留 stats 自治
+const INTENSITY_META: Record<number, { emoji: string; label: string }> = {
+  1: { emoji: '🌿', label: '放松' },
+  2: { emoji: '🚶', label: '轻度' },
+  3: { emoji: '🏃', label: '中等' },
+  4: { emoji: '🔥', label: '高强' },
+  5: { emoji: '⚡', label: '极限' },
+};
+
+const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六'];
+
+// 月份分组 key -> 用于显示的标题(当年只显示 "M 月",跨年显示 "YYYY 年 M 月")
+function formatMonthTitle(key: string): string {
+  // key: YYYY-MM
+  const d = dayjs(key + '-01');
+  if (d.year() === dayjs().year()) return `${d.month() + 1} 月`;
+  return `${d.year()} 年 ${d.month() + 1} 月`;
+}
+
 // 主数值与上一期对比公式不分大类卡片;复用给"累计时长"格式化(分钟 -> 字符串)
 function formatDurationLabel(mins: number): string {
   if (mins < 60) return `${mins}m`;
@@ -73,6 +96,7 @@ export default function StatsScreen() {
   const [logs, setLogs] = useState<TrainingLog[]>([]);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [periodMode, setPeriodMode] = useState<PeriodMode>('week');
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
 
   useEffect(() => {
     (async () => {
@@ -181,7 +205,50 @@ export default function StatsScreen() {
     return { ranked, totalLogs, max };
   }, [logs]);
 
-  const visibleLogs = showAllHistory ? logs : logs.slice(0, HISTORY_INITIAL);
+  // 历史区筛选(只影响历史区,不影响 KPI/信号灯/分布/热力图)
+  const filteredLogs = useMemo(() => {
+    switch (historyFilter) {
+      case 'training':
+        return logs.filter((l) => !l.match_result);
+      case 'match':
+        return logs.filter((l) => !!l.match_result);
+      case 'high':
+        return logs.filter((l) => l.intensity >= 4);
+      case 'note':
+        return logs.filter((l) => l.note != null && l.note.trim().length > 0);
+      case 'all':
+      default:
+        return logs;
+    }
+  }, [logs, historyFilter]);
+
+  const visibleLogs = showAllHistory ? filteredLogs : filteredLogs.slice(0, HISTORY_INITIAL);
+
+  // 按 YYYY-MM 分组 visibleLogs;保留时序(logs 已按 date desc),组内仍 desc
+  const groupedHistory = useMemo(() => {
+    const groups: { key: string; items: TrainingLog[]; mins: number }[] = [];
+    const indexMap = new Map<string, number>();
+    visibleLogs.forEach((l) => {
+      const key = dayjs(l.date).format('YYYY-MM');
+      let idx = indexMap.get(key);
+      if (idx === undefined) {
+        idx = groups.length;
+        indexMap.set(key, idx);
+        groups.push({ key, items: [], mins: 0 });
+      }
+      groups[idx].items.push(l);
+      groups[idx].mins += l.duration_min;
+    });
+    return groups;
+  }, [visibleLogs]);
+
+  // 切换筛选时重置展开状态
+  const onSwitchFilter = (f: HistoryFilter) => {
+    if (historyFilter === f) return;
+    vibrateLight();
+    setHistoryFilter(f);
+    setShowAllHistory(false);
+  };
 
   return (
     <Screen>
@@ -369,49 +436,162 @@ export default function StatsScreen() {
           </Card>
         ) : (
           <>
-            {visibleLogs.map((l) => (
-              <Pressable
-                key={l.id}
-                onPress={() => {
-                  vibrateLight();
-                  router.push({ pathname: '/log/[id]', params: { id: String(l.id) } });
-                }}
-                style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-              >
-                <Card style={{ marginBottom: spacing.sm }}>
-                  <View style={styles.logRow}>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.logDate}>{l.date}</Text>
-                        {l.match_result === 'win' && <Text style={{ fontSize: 12 }}>🏆</Text>}
-                        {l.match_result === 'loss' && <Text style={{ fontSize: 12 }}>💔</Text>}
-                      </View>
-                      <Text style={styles.logCat}>
-                        {l.categories.join('、') || '综合'}
-                        {l.opponent ? ` (vs ${l.opponent})` : ''}
+            {/* 轻量筛选条:横向 Pill,复用 periodPill 样式 */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterRow}
+            >
+              {(
+                [
+                  { key: 'all', label: '全部' },
+                  { key: 'training', label: '🏸 训练' },
+                  { key: 'match', label: '⚔️ 实战' },
+                  { key: 'high', label: '🔥 高强度' },
+                  { key: 'note', label: '📝 有笔记' },
+                ] as { key: HistoryFilter; label: string }[]
+              ).map((f) => {
+                const active = historyFilter === f.key;
+                return (
+                  <Pressable
+                    key={f.key}
+                    onPress={() => onSwitchFilter(f.key)}
+                    style={[
+                      styles.periodPill,
+                      active && { backgroundColor: colors.primary, borderColor: colors.primary },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: active ? '#fff' : colors.textDim,
+                        fontWeight: '600',
+                        fontSize: font.small,
+                      }}
+                    >
+                      {f.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {filteredLogs.length === 0 ? (
+              <View style={styles.filterEmpty}>
+                <Text style={styles.filterEmptyMain}>筛选后没有匹配的训练记录</Text>
+                <Text style={styles.filterEmptySub}>点上面 "全部" 重置筛选</Text>
+              </View>
+            ) : (
+              <>
+                {groupedHistory.map((group) => (
+                  <View key={group.key}>
+                    {/* 月份子标题(非 Card) */}
+                    <View style={styles.monthHeader}>
+                      <Text style={styles.monthTitle}>{formatMonthTitle(group.key)}</Text>
+                      <Text style={styles.monthStat}>
+                        {group.items.length} 次 · {formatDurationLabel(group.mins)}
                       </Text>
-                      {l.note ? <Text style={styles.logNote}>📝 {l.note}</Text> : null}
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.logMins}>{l.duration_min} 分钟</Text>
-                      <Text style={styles.logStar}>
-                        {'★'.repeat(l.intensity)}
-                        {'☆'.repeat(5 - l.intensity)}
-                      </Text>
-                    </View>
+                    <View style={styles.monthDivider} />
+                    {group.items.map((l) => {
+                      const md = dayjs(l.date).format('MM-DD');
+                      const weekday = WEEK_CN[dayjs(l.date).day()];
+                      const cats = l.categories.length > 0 ? l.categories : ['综合'];
+                      const visibleCats = cats.slice(0, 3);
+                      const overflowCats = cats.length - visibleCats.length;
+                      const hasMatch = !!l.match_result;
+                      const hasOpponent = !!l.opponent;
+                      const matchEmoji =
+                        l.match_result === 'win'
+                          ? '🏆'
+                          : l.match_result === 'loss'
+                          ? '💔'
+                          : l.match_result === 'draw'
+                          ? '🤝'
+                          : '';
+                      const intensityMeta = INTENSITY_META[l.intensity] ?? INTENSITY_META[3];
+                      return (
+                        <Pressable
+                          key={l.id}
+                          onPress={() => {
+                            vibrateLight();
+                            router.push({ pathname: '/log/[id]', params: { id: String(l.id) } });
+                          }}
+                          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                        >
+                          <Card style={{ marginBottom: spacing.sm }}>
+                            <View style={styles.logRow}>
+                              <View style={{ flex: 1 }}>
+                                {/* 第 1 行:日期 + 周X */}
+                                <View style={styles.logHeadRow}>
+                                  <Text style={styles.logDate}>{md}</Text>
+                                  <Text style={styles.logWeekday}>周{weekday}</Text>
+                                </View>
+                                {/* 第 2 行:分类 chip */}
+                                <View style={styles.chipRow}>
+                                  {visibleCats.map((c) => (
+                                    <View key={c} style={styles.chip}>
+                                      <Text style={styles.chipText}>{c}</Text>
+                                    </View>
+                                  ))}
+                                  {overflowCats > 0 && (
+                                    <View style={styles.chip}>
+                                      <Text style={styles.chipText}>+{overflowCats}</Text>
+                                    </View>
+                                  )}
+                                </View>
+                                {/* 第 3 行:对手/结果(条件) */}
+                                {(hasMatch || hasOpponent) && (
+                                  <Text style={styles.logMeta}>
+                                    ⚔️ vs {l.opponent ?? ''}
+                                    {matchEmoji ? ` ${matchEmoji}` : ''}
+                                  </Text>
+                                )}
+                                {/* 第 4 行:note(条件,单行截断) */}
+                                {l.note ? (
+                                  <Text style={styles.logMeta} numberOfLines={1}>
+                                    📝 {l.note}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              {/* 右侧指标区 */}
+                              <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={styles.logMins}>{l.duration_min} 分钟</Text>
+                                <View style={styles.dotRow}>
+                                  {[1, 2, 3, 4, 5].map((i) => (
+                                    <View
+                                      key={i}
+                                      style={[
+                                        styles.dot,
+                                        {
+                                          backgroundColor:
+                                            i <= l.intensity ? colors.primary : colors.cardAlt,
+                                        },
+                                      ]}
+                                    />
+                                  ))}
+                                </View>
+                                <Text style={styles.intensityLabel}>
+                                  {intensityMeta.emoji} {intensityMeta.label}
+                                </Text>
+                              </View>
+                            </View>
+                          </Card>
+                        </Pressable>
+                      );
+                    })}
                   </View>
-                </Card>
-              </Pressable>
-            ))}
-            {logs.length > HISTORY_INITIAL && (
-              <Pressable
-                onPress={() => setShowAllHistory((v) => !v)}
-                style={({ pressed }) => [styles.expandBtn, { opacity: pressed ? 0.7 : 1 }]}
-              >
-                <Text style={styles.expandText}>
-                  {showAllHistory ? '收起' : `查看全部 ${logs.length} 条 →`}
-                </Text>
-              </Pressable>
+                ))}
+                {filteredLogs.length > HISTORY_INITIAL && (
+                  <Pressable
+                    onPress={() => setShowAllHistory((v) => !v)}
+                    style={({ pressed }) => [styles.expandBtn, { opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Text style={styles.expandText}>
+                      {showAllHistory ? '收起' : `查看全部 ${filteredLogs.length} 条 →`}
+                    </Text>
+                  </Pressable>
+                )}
+              </>
             )}
           </>
         )}
@@ -564,11 +744,39 @@ const styles = StyleSheet.create({
   kpiSub: { color: colors.textDim, fontSize: font.tiny, marginTop: 2, opacity: 0.85 },
   empty: { color: colors.textDim, textAlign: 'center', paddingVertical: spacing.lg },
   logRow: { flexDirection: 'row', alignItems: 'center' },
-  logDate: { color: colors.text, fontWeight: '600' },
-  logCat: { color: colors.textDim, fontSize: font.small, marginTop: 2 },
-  logNote: { color: colors.textDim, fontSize: font.small, marginTop: 4 },
+  logHeadRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  logDate: { color: colors.text, fontSize: font.body, fontWeight: '700' },
+  logWeekday: { color: colors.textDim, fontSize: font.tiny },
+  logMeta: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
   logMins: { color: colors.primary, fontWeight: '700', fontSize: font.body },
-  logStar: { color: colors.warn, fontSize: font.small, marginTop: 2 },
+  // 分类 chip 平铺
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  chip: {
+    backgroundColor: colors.cardAlt,
+    borderRadius: radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  chipText: { color: colors.textDim, fontSize: font.tiny },
+  // 5 段强度 dot
+  dotRow: { flexDirection: 'row', gap: 3, marginTop: 4 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  intensityLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 2 },
+  // 月份子标题(非 Card)
+  monthHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: spacing.lg,
+  },
+  monthTitle: { color: colors.text, fontSize: font.small, fontWeight: '700' },
+  monthStat: { color: colors.textDim, fontSize: font.tiny },
+  monthDivider: { height: 1, backgroundColor: colors.border, marginTop: spacing.xs, marginBottom: spacing.sm },
+  // 历史筛选条
+  filterRow: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs, paddingRight: spacing.md },
+  filterEmpty: { paddingVertical: spacing.lg, alignItems: 'center' },
+  filterEmptyMain: { color: colors.text, fontSize: font.small, fontWeight: '600' },
+  filterEmptySub: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
   heatCell: { width: 14, height: 14, borderRadius: 3 },
   heatLegend: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: spacing.md },
   heatLegendText: { color: colors.textDim, fontSize: font.tiny, marginHorizontal: 4 },

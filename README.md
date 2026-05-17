@@ -108,6 +108,24 @@ npx eas-cli build -p android --profile preview
 > Agent 协作规则详见 [`AGENTS.md`](./AGENTS.md)。
 
 <!-- ITERATION_LOG_START -->
+### v0.39.0 · 2026-05-17
+
+- **产品需求**：stats Tab 历史记录区升级为「私教训练流水」（按月分组 + 信息密度升级 + 筛选 Pill）。
+- **开发改动**：
+  - `app/(tabs)/stats.tsx`：
+    - 新增 `INTENSITY_META`、`WEEK_CN`、`formatMonthTitle`、`HistoryFilter` 等常量与类型；`filteredLogs` / `visibleLogs` / `groupedHistory` 派生链路；
+    - 历史区按 `YYYY-MM` 倒序分组渲染，inline 子标题（非 Card） + 1px border 分隔；当年省略年份；
+    - 卡片重排：左侧 `MM-DD 周X` / 分类 chip（≤3 + +N） / `⚔️ vs ...` / `📝 note (1 行)`；右侧分钟 / 5 段 dot / intensity emoji+2字；
+    - 历史区顶部 5 个筛选 Pill（全部 / 训练 / 实战 / 高强度 / 有笔记），复用 `periodPill` 样式，切换 vibrateLight + 重置 showAllHistory；筛选不影响 KPI/信号灯/分布/热力图；
+    - 旧 `★★★☆☆` 星星样式 100% 移除（*注：KPI 区遗留一处 `★ ` 未改*）。
+  - `package.json` & `app.json`：版本号提升至 v0.39.0。
+- **测试结论**：
+  - ✅ 历史区按月分组与子标题渲染符合预期，数据统计准确。
+  - ✅ 新版卡片信息密度排版正确（包含 chip、emoji、dot 与 note 截断）。
+  - ✅ 顶部筛选 Pill 交互及过滤逻辑验证通过，对其他图表无污染。
+  - ⚠️ **遗留缺陷**：PRD 要求 100% 移除 `★`，但在 `app/(tabs)/stats.tsx` 第 306 行（KPI "平均强度" 的 `prefix="★ "`）遗漏未改。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 
 ### v0.38.0 · 2026-05-17
 
