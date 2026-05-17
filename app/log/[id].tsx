@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import dayjs from 'dayjs';
@@ -23,11 +23,89 @@ const RESULT_META: Record<NonNullable<TrainingLog['match_result']>, { emoji: str
   draw: { emoji: '🤝', label: '平', color: colors.warn },
 };
 
+// 强度档位语义（1-5）
+const INTENSITY_LABEL: Record<number, string> = {
+  1: '放松活动',
+  2: '轻度',
+  3: '中等',
+  4: '高强度',
+  5: '极限',
+};
+
+// 「回顾」派生数据：纯文字小行
+type ReviewLine = { key: string; text: string; color: string };
+
+function buildReviewLines(current: TrainingLog, all: TrainingLog[]): ReviewLine[] {
+  const lines: ReviewLine[] = [];
+  const others = all.filter((l) => l.id !== current.id);
+
+  // 1) vs 上次同类训练
+  if (current.categories.length === 0) {
+    lines.push({ key: 'vs', text: '📅 无同类训练可对比', color: colors.textDim });
+  } else {
+    const sameCat = others
+      .filter((l) => l.date < current.date && l.categories.some((c) => current.categories.includes(c)))
+      .sort((a, b) => (a.date < b.date ? 1 : -1)); // date desc
+    const prev = sameCat[0];
+    if (!prev) {
+      lines.push({
+        key: 'vs',
+        text: `🌱 这是「${current.categories[0]}」的第一次记录`,
+        color: colors.text,
+      });
+    } else {
+      const sharedCat = prev.categories.find((c) => current.categories.includes(c)) ?? current.categories[0];
+      const dur = current.duration_min - prev.duration_min;
+      const inten = current.intensity - prev.intensity;
+      const durPart =
+        dur === 0 ? '时长持平' : dur > 0 ? `多练 ${dur} 分钟` : `少练 ${Math.abs(dur)} 分钟`;
+      const intenPart =
+        inten === 0 ? '强度持平' : inten > 0 ? `强度 +${inten}` : `强度 ${inten}`;
+      const emoji = dur > 0 ? '📈' : dur < 0 ? '📉' : '➡️';
+      lines.push({
+        key: 'vs',
+        text: `${emoji} 比上次（${prev.date}「${sharedCat}」）${durPart}，${intenPart}`,
+        color: colors.text,
+      });
+    }
+  }
+
+  // 2) 本月累计（按 current.date 所在 YYYY-MM）
+  const ym = current.date.slice(0, 7);
+  const monthLogs = all.filter((l) => l.date.startsWith(ym));
+  const monthMin = monthLogs.reduce((a, l) => a + l.duration_min, 0);
+  lines.push({
+    key: 'month',
+    text: `📊 本月累计 ${monthLogs.length} 次 / ${monthMin} 分钟`,
+    color: colors.text,
+  });
+
+  // 3) 强度分位（仅当历史 ≥3 条）
+  if (others.length >= 3) {
+    const sorted = [...others].map((l) => l.intensity).sort((a, b) => a - b);
+    // 当前 intensity 在历史中排名分位：>80% / <20% / 中段
+    const ltCount = sorted.filter((x) => x < current.intensity).length;
+    const gtCount = sorted.filter((x) => x > current.intensity).length;
+    const pctHigher = ltCount / sorted.length; // 当前比 pctHigher 比例的历史更高
+    const pctLower = gtCount / sorted.length; // 当前比 pctLower 比例的历史更低
+    if (pctHigher > 0.8) {
+      lines.push({ key: 'pct', text: '🔥 强度高于历史 80% 的训练', color: colors.primary });
+    } else if (pctLower > 0.8) {
+      lines.push({ key: 'pct', text: '🛋 比平时温和', color: colors.textDim });
+    } else {
+      lines.push({ key: 'pct', text: '⚖️ 与平时持平', color: colors.text });
+    }
+  }
+
+  return lines;
+}
+
 export default function TrainingLogDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const numericId = Number(id);
 
   const [log, setLog] = useState<TrainingLog | null>(null);
+  const [allLogs, setAllLogs] = useState<TrainingLog[]>([]);
   const [planTitle, setPlanTitle] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -41,6 +119,7 @@ export default function TrainingLogDetail() {
       const all = await listTrainingLogs(200);
       const hit = all.find((l) => l.id === numericId) ?? null;
       setLog(hit);
+      setAllLogs(all);
       if (hit?.plan_id) {
         const p = await getPlanById(hit.plan_id).catch(() => null);
         setPlanTitle(p?.name ?? null);
@@ -49,13 +128,30 @@ export default function TrainingLogDetail() {
     })();
   }, [numericId]);
 
+  // 回顾派生小行：纯客户端计算
+  const reviewLines = useMemo(
+    () => (log && allLogs.length > 1 ? buildReviewLines(log, allLogs) : []),
+    [log, allLogs],
+  );
+
   function confirmDelete() {
     const doDelete = async () => {
       await deleteTrainingLog(numericId);
       vibrateLight();
       router.back();
     };
-    const summary = log ? `${log.date} · ${log.duration_min} 分钟` : '';
+    // 补上下文：分类前 2 项 + 对手（如有）
+    let summary = '';
+    if (log) {
+      const parts: string[] = [log.date, `${log.duration_min} 分钟`];
+      if (log.categories.length > 0) {
+        parts.push(log.categories.slice(0, 2).join('/'));
+      }
+      if (log.opponent) {
+        parts.push(`vs ${log.opponent}`);
+      }
+      summary = parts.join(' · ');
+    }
     if (Platform.OS === 'web') {
       if (window.confirm(`删除这条训练记录？\n${summary}`)) doDelete();
       return;
@@ -134,15 +230,43 @@ export default function TrainingLogDetail() {
             <Text style={styles.coreLabel}>分钟</Text>
           </View>
           <View style={styles.divider} />
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+          <Pressable
+            onPress={vibrateLight}
+            style={({ pressed }) => [
+              { flex: 1, alignItems: 'flex-end', opacity: pressed ? 0.6 : 1 },
+            ]}
+          >
             <Text style={styles.coreStar}>
               {'★'.repeat(log.intensity)}
               <Text style={{ color: colors.border }}>{'☆'.repeat(5 - log.intensity)}</Text>
             </Text>
             <Text style={styles.coreLabel}>强度 {log.intensity}/5</Text>
-          </View>
+          </Pressable>
         </View>
+        <Text style={styles.intensityHint}>
+          {log.intensity}={INTENSITY_LABEL[log.intensity] ?? '—'}
+        </Text>
       </Card>
+
+      {/* 回顾：派生小行；首次训练（only self）时不渲染 */}
+      {reviewLines.length > 0 && (
+        <Section title="回顾">
+          <Card>
+            {reviewLines.map((line, idx) => (
+              <Text
+                key={line.key}
+                style={[
+                  styles.reviewLine,
+                  { color: line.color },
+                  idx > 0 && { marginTop: spacing.sm },
+                ]}
+              >
+                {line.text}
+              </Text>
+            ))}
+          </Card>
+        </Section>
+      )}
 
       {/* 训练内容 */}
       <Section title="训练内容">
@@ -239,6 +363,14 @@ const styles = StyleSheet.create({
   coreStar: { color: colors.warn, fontSize: 22, fontWeight: '700' },
   coreLabel: { color: colors.textDim, fontSize: font.small, marginTop: 4 },
   divider: { width: 1, height: 40, backgroundColor: colors.border, marginHorizontal: spacing.md },
+  intensityHint: {
+    color: colors.textDim,
+    fontSize: font.tiny,
+    marginTop: spacing.sm,
+    textAlign: 'right',
+  },
+
+  reviewLine: { fontSize: font.small, lineHeight: 20 },
 
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {

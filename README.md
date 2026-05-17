@@ -109,6 +109,23 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.38.0 · 2026-05-17
+
+- **产品需求**：训练详情页升级为值得回顾的复盘卡。
+- **开发改动**：
+  - `app/log/[id].tsx`：
+    - 新增 `INTENSITY_LABEL` 字典与 `buildReviewLines` 纯派生函数；新增 `allLogs` state + `useMemo` 计算 `reviewLines`，零新增 DB 查询；
+    - 在核心指标 Card 与训练内容之间插入「回顾」Section（vs 上次同类 / 本月累计 / 强度分位三条派生小行）；
+    - 核心指标 Card 右半区包 Pressable + vibrateLight + 透明度反馈；底部追加常驻强度档位文案；
+    - 删除确认 Alert summary 补上分类前 2 项与对手。
+  - `package.json` & `app.json`：版本号提升至 v0.38.0。
+- **测试结论**：
+  - ✅ 回顾 Section 能够正确按条件渲染，并且小行展示无误；
+  - ✅ 强度区域支持点击反馈与档位文案展示；
+  - ✅ 删除提示的 summary 内容符合预期；
+  - ✅ vs 上次同类、本月累计、强度分位等派生逻辑运转正常。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.37.0 · 2026-05-17
 
 - **产品需求**：首页「最近训练」升级为回顾入口。
