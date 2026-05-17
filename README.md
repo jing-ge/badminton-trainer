@@ -109,6 +109,22 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.33.0 · 2026-05-17
+
+- **产品需求**：schedule 训练日程页升级。
+- **开发改动**：
+  - `app/schedule/index.tsx`：升级为私教中心日程提醒。新增倒计时三态（今天/明天/周X）并支持降级「已暂停」文案；UI 星期以周一起头（底库保持 0=Sun）；增加快捷时间 chip，支持高亮与触觉反馈；通过 `addWith` 增加去重拦截（ Alert 冲突）；新增含 3 个快速 preset chip 的空态卡。
+  - `src/utils/notifications.ts`：添加 `sendTestNotification` 以支持 { seconds: 2 } 触发的本地测试通知，支持跨端失败 Alert 降级且不写入 DB；保持原有初始化不变。
+  - `package.json` & `app.json`：提升版本号至 v0.33.0。
+- **测试结论**：
+  - ✅ 倒计时逻辑三态渲染正确，暂停时应用了降饱和度设计。
+  - ✅ UI 星期序列处理正确无误，与底层 DB 周序号匹配。
+  - ✅ chip 高亮选中表现和 `vibrateLight` 触觉反馈符合预期。
+  - ✅ 同一时段 (weekday+hour+minute) 添加校验去重有效。
+  - ✅ Preset 空态引导流顺畅。
+  - ✅ 独立测试通知 Web 跨端拦截与原生调度不写入 DB 符合要求。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.32.0 · 2026-05-17
 
 - **产品需求**：训练 run 页暂停遮罩 + 快速决策按钮。

@@ -61,3 +61,22 @@ export async function cancelReminder(id: string) {
     await Notifications.cancelScheduledNotificationAsync(id);
   } catch {}
 }
+
+// 2 秒后弹一条本地测试通知，用于自检通知权限/通道是否生效。
+// 不写入 schedules 表，调用方自行处理 Web 降级与权限失败提示。
+export async function sendTestNotification(): Promise<void> {
+  if (isWeb) throw new Error('Web 预览不支持本地推送');
+  const ok = await ensureNotificationPermission();
+  if (!ok) throw new Error('未授予通知权限');
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '羽毛球训练 · 测试通知',
+      body: '收到这条说明设置已生效',
+      sound: true,
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 2,
+    },
+  });
+}
