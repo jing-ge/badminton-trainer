@@ -1183,26 +1183,12 @@ const styles = StyleSheet.create({
   roundSmallBtn: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
   iconBtnLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 8 },
   playPauseBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-  // v0.41 真机修复：Android 上 elevation + rgba 半透明背景组合会强制 view 升级为
-  // hardware layer，已知 bug 会让子 Text/emoji 在某些 ROM 上不渲染（Web 端无此问题）。
-  // 删除 elevation: 3 这一行，对比度增益不依赖它（背景+边框已足够），iOS shadow* 保留。
-  conditionBtn: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 2,
-    borderColor: colors.textDim,
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  conditionBtnActive: {
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(16,185,129,0.32)',
-  },
+  // v0.42 紧急回退：v0.40/v0.41 用 rgba 半透明背景 + 2px textDim 边框在 Android 真机上
+  // 触发了 child Text/emoji 不渲染的 bug（删 elevation 也没救回来），Web 表现正常。
+  // 回退到 v0.39 之前的稳定基线：cardAlt 实色 + border 1px 边框。
+  // "按钮和背景融合"的对比度问题暂时放弃，保住"emoji + 文字看得见"这个稳定基线优先。
+  conditionBtn: { flex: 1, alignItems: 'center', backgroundColor: colors.cardAlt, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  conditionBtnActive: { borderColor: colors.primary, backgroundColor: colors.cardAlt },
   conditionText: { color: colors.text, fontWeight: '700', fontSize: font.h3, marginTop: spacing.sm },
   conditionDesc: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
   badgeWrap: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(245, 158, 11, 0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.warn, shadowColor: colors.warn, shadowOpacity: 0.8, shadowRadius: 20, shadowOffset: { width: 0, height: 0 } },

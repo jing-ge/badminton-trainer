@@ -108,6 +108,15 @@ npx eas-cli build -p android --profile preview
 > Agent 协作规则详见 [`AGENTS.md`](./AGENTS.md)。
 
 <!-- ITERATION_LOG_START -->
+### v0.42.0 · 2026-05-17
+
+- **Android 真机紧急回退**：v0.40/v0.41 的 rgba 半透明背景 + textDim 边框方案在 Android 上让 conditionBtn 内的 emoji + 文字完全不渲染（删 elevation 也没救回来），Web 端表现正常。
+- **回退到 v0.39 之前的稳定基线**：`conditionBtn` 改回 `colors.cardAlt` 实色 + 1px `colors.border` 边框，`conditionBtnActive` 仅靠 `colors.primary` 边框色提示选中态。彻底放弃 v0.40 引入的 rgba/elevation/textDim 边框方案。
+- **代价**：用户原本投诉的"按钮和背景几乎融为一体"问题回归——这是已知 trade-off，**优先保证 emoji + 文字看得见**，对比度问题留待未来用其它方案（如外层 wrap shadow、SVG 描边、或加更亮的内部 emoji 字号）。
+- **同时观察到的语音问题**：v0.40/v0.41 EAS 切到新账号 `jingjingjing777` 生成了**新 keystore**，Android 把新签名 APK 当作全新应用 → `AsyncStorage` 被清空 → 用户在 `prefs.ttsVoice` 选过的好普通话 voice 丢失 → 走系统默认 TTS 引擎质量差。**这是 Android 签名机制的正常行为，非 app bug**。用户需在「我的→🔊 语音设置」重新挑一个 voice 即可恢复。后续每次签名变更都会触发此现象，建议在 README 留作发版须知。
+- **版本号**：`package.json` & `app.json` 提升至 v0.42.0。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.41.0 · 2026-05-17
 
 - **Android 真机紧急修复**：用户反馈 v0.40.0 装到 Android 上后，三个状态按钮（💪满血/⚡一般/🪫疲惫）的卡片轮廓看得见，**但里面的 emoji 和文字全部不显示**（Web 端完全正常）。

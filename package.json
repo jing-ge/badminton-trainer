@@ -1,6 +1,6 @@
 {
   "name": "badminton-trainer",
-  "version": "0.41.0",
+  "version": "0.42.0",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
