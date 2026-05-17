@@ -52,6 +52,7 @@ export default function RootLayout() {
           <Stack.Screen name="schedule/index" options={{ title: '训练日程' }} />
           <Stack.Screen name="log/[id]" options={{ title: '训练详情' }} />
           <Stack.Screen name="about" options={{ title: '关于' }} />
+          <Stack.Screen name="settings/reset" options={{ title: '清空数据' }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

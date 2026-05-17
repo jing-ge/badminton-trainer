@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
@@ -8,7 +8,6 @@ import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Section } from '@/components/Section';
 import { colors, font, radius, spacing } from '@/theme/tokens';
-import { resetDB } from '@/db';
 import { getStreakStats, listTrainingLogs, type TrainingLog } from '@/db/trainingLogs';
 import { getActivePlan } from '@/db/plans';
 import { vibrateLight } from '@/utils/haptics';
@@ -117,22 +116,11 @@ export default function MeScreen() {
       onPress: () => router.push('/about' as never),
     },
     {
-      label: '清空所有数据',
-      emoji: '⚠️',
+      // v0.35.0：交互下沉到 /settings/reset 独立确认页
+      label: '清空所有数据 / 退出私教',
+      emoji: '🗑',
       danger: true,
-      onPress: () => {
-        Alert.alert('确认清空', '所有训练记录、复盘视频、日程将被删除', [
-          { text: '取消', style: 'cancel' },
-          {
-            text: '清空',
-            style: 'destructive',
-            onPress: async () => {
-              await resetDB();
-              Alert.alert('已清空');
-            },
-          },
-        ]);
-      },
+      onPress: () => router.push('/settings/reset' as never),
     },
   ];
 
@@ -259,29 +247,25 @@ export default function MeScreen() {
         </Section>
       </View>
 
-      {/* ===== 既有 3 个列表项（不动） ===== */}
+      {/* ===== 既有 3 个列表项 + danger 入口（v0.35.0 视觉降噪） ===== */}
       <View>
         {items.map((it) => (
-          <Pressable
-            key={it.label}
-            onPress={it.onPress}
-            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-          >
-            <Card style={{ marginBottom: spacing.sm }}>
-              <View style={styles.row}>
-                <Text style={{ fontSize: 22 }}>{it.emoji}</Text>
-                <Text
-                  style={[
-                    styles.label,
-                    it.danger && { color: colors.danger },
-                  ]}
-                >
-                  {it.label}
-                </Text>
-                <Text style={{ color: colors.textDim, fontSize: 22 }}>›</Text>
-              </View>
-            </Card>
-          </Pressable>
+          <View key={it.label}>
+            {/* danger 项前插一段呼吸空间，弱化破坏性入口的视觉权重 */}
+            {it.danger && <View style={{ height: spacing.xl }} />}
+            <Pressable
+              onPress={it.onPress}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Card style={{ marginBottom: spacing.sm }}>
+                <View style={styles.row}>
+                  <Text style={{ fontSize: 22 }}>{it.emoji}</Text>
+                  <Text style={styles.label}>{it.label}</Text>
+                  <Text style={{ color: colors.textDim, fontSize: 22 }}>›</Text>
+                </View>
+              </Card>
+            </Pressable>
+          </View>
         ))}
       </View>
 

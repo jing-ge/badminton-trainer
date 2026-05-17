@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { colors, font, radius, spacing } from '@/theme/tokens';
+import { vibrateLight } from '@/utils/haptics';
 
 // v0.30.0：实页化「关于」。技术栈版本号硬编码自 package.json，
 // 升级依赖时手动同步即可（频率极低，YAGNI 不做自动读取）。
@@ -35,9 +36,26 @@ export default function AboutScreen() {
       {/* 隐私承诺 */}
       <Card style={{ marginTop: spacing.xl }}>
         <Text style={styles.cardTitle}>隐私承诺</Text>
-        {PRIVACY.map((line) => (
-          <Text key={line} style={styles.bullet}>{line}</Text>
-        ))}
+        {PRIVACY.map((line, idx) => {
+          // v0.35.0：第 3 条引导到清空数据确认页（其余两条保持纯文本）
+          if (idx === 2) {
+            return (
+              <Pressable
+                key={line}
+                onPress={() => {
+                  vibrateLight();
+                  router.push('/settings/reset' as never);
+                }}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+              >
+                <Text style={styles.bullet}>{line} ›</Text>
+              </Pressable>
+            );
+          }
+          return (
+            <Text key={line} style={styles.bullet}>{line}</Text>
+          );
+        })}
       </Card>
 
       {/* 技术栈 */}

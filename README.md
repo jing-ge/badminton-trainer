@@ -109,6 +109,20 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.35.0 · 2026-05-17
+
+- **产品需求**：隐私清空数据独立确认页。
+- **开发改动**：
+  - `app/settings/reset.tsx`：新建独立的数据清空确认页，展示 5 项本地数据统计，提供双重确认及 Web 兼容。
+  - `app/(tabs)/me.tsx`：移除原有行内 Alert，安全项入口指向独立页并弱化视觉权重。
+  - `app/_layout.tsx`：注册 `settings/reset` 路由。
+  - `app/about.tsx`：隐私声明第三条增加点击跳转至数据清空页。
+- **测试结论**：
+  - ✅ UI 及状态反馈：红灰配色警示页，数据拉取为空或错误显示 `—`，加载未就绪时禁用按钮。
+  - ✅ 核心逻辑：PREFS_KEYS 包含 6 个核心配置，二次确认跨端一致，清除及路由回退正常。
+  - ✅ Web 兼容与交互体验：Web 端使用 `window.confirm`，原生端使用 `Alert`，多处触觉反馈。
+- **typecheck**：✅ 通过
+
 ### v0.34.0 · 2026-05-17
 
 - **产品需求**：Library 收藏维度过滤与卡片徽章展示。
