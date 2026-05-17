@@ -109,6 +109,21 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.34.0 · 2026-05-17
+
+- **产品需求**：Library 收藏维度过滤与卡片徽章展示。
+- **开发改动**：
+  - `app/(tabs)/library.tsx`：CATEGORIES 增加 `⭐ 收藏` 选项；基于已有的 `favorites` 派生 `favIds` 供过滤；过滤逻辑中叠加分类与搜索，支持无结果与空收藏态独立文案展示；`TutorialCard` 补充接收 `favorite` prop 以并在 level 旁追加 ⭐ 徽章；副标题动态支持显示 `已收藏 {N}` 并使用 `tabular-nums` 字体变体。
+  - `package.json` & `app.json`：提升版本号至 v0.34.0。
+- **测试结论**：
+  - ✅ `CATEGORIES` 含 `'⭐ 收藏'` 且位于 `'全部'` 后，过滤逻辑在 `cat === '⭐ 收藏'` 与 `query` 叠加正确。
+  - ✅ 收藏为空切过去时显示「还没有收藏 / ...」，正常空结果保持「没有匹配到动作要点」。
+  - ✅ 副标题显示 `已收藏 M` 逻辑与 `业余中级适用` 切换正确，应用了 `tabular-nums`。
+  - ✅ `TutorialCard` 成功渲染徽章，并有明确的 `colors.warn` 和 `spacing.xs`。
+  - ✅ 不涉及对 `db` / `data` / `TutorialStrip` 的污染或改动，避免二次请求查询 DB。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
+
 ### v0.33.0 · 2026-05-17
 
 - **产品需求**：schedule 训练日程页升级。

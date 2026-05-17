@@ -9,7 +9,7 @@ import { tutorials, Tutorial, findTutorial } from '@/data/tutorials';
 import { listFavoriteIds, listRecentViews } from '@/db/tutorials';
 import { TutorialStrip, TutorialWithBadge } from '@/features/library/TutorialStrip';
 
-const CATEGORIES = ['全部', '后场', '前场', '步法', '发球', '战术'] as const;
+const CATEGORIES = ['全部', '⭐ 收藏', '后场', '前场', '步法', '发球', '战术'] as const;
 
 function humanizeAgo(viewedAt: number): string {
   const days = dayjs().startOf('day').diff(dayjs(viewedAt).startOf('day'), 'day');
@@ -46,21 +46,35 @@ export default function LibraryScreen() {
     }, []),
   );
 
+  // 派生收藏 ID 集合，复用 useFocusEffect 已查的 favorites，不再 fire DB
+  const favIds = useMemo(() => favorites.map((t) => t.id), [favorites]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tutorials.filter((t) => {
-      if (cat !== '全部' && t.category !== cat) return false;
+      if (cat === '⭐ 收藏') {
+        if (!favIds.includes(t.id)) return false;
+      } else if (cat !== '全部' && t.category !== cat) {
+        return false;
+      }
       if (!q) return true;
       if (t.title.toLowerCase().includes(q)) return true;
       if (t.keyPoints.some((p) => p.toLowerCase().includes(q))) return true;
       return false;
     });
-  }, [cat, query]);
+  }, [cat, query, favIds]);
 
   return (
     <Screen>
       <Text style={styles.title}>技术动作教程</Text>
-      <Text style={styles.sub}>共 {tutorials.length} 个要点 · 业余中级适用</Text>
+      <Text style={styles.sub}>
+        共 <Text style={{ fontVariant: ['tabular-nums'] }}>{tutorials.length}</Text> 个要点 ·{' '}
+        {favIds.length > 0 ? (
+          <>已收藏 <Text style={{ fontVariant: ['tabular-nums'] }}>{favIds.length}</Text></>
+        ) : (
+          '业余中级适用'
+        )}
+      </Text>
 
       <TutorialStrip title="⭐ 我的收藏" items={favorites} />
       <TutorialStrip title="⏱ 最近浏览" items={recents} />
@@ -104,12 +118,26 @@ export default function LibraryScreen() {
       <View style={{ marginTop: spacing.md }}>
         {filtered.length === 0 ? (
           <Card>
-            <Text style={styles.empty}>没有匹配到动作要点</Text>
-            <Text style={styles.emptyHint}>试试换个关键词,或清除分类筛选</Text>
+            {cat === '⭐ 收藏' && favIds.length === 0 ? (
+              <>
+                <Text style={styles.empty}>还没有收藏</Text>
+                <Text style={styles.emptyHint}>在教程详情页右上角点亮 ⭐ 即可加入收藏</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.empty}>没有匹配到动作要点</Text>
+                <Text style={styles.emptyHint}>试试换个关键词,或清除分类筛选</Text>
+              </>
+            )}
           </Card>
         ) : (
           filtered.map((t) => (
-            <TutorialCard key={t.id} t={t} onPress={() => router.push(`/tutorial/${t.id}`)} />
+            <TutorialCard
+              key={t.id}
+              t={t}
+              favorite={favIds.includes(t.id)}
+              onPress={() => router.push(`/tutorial/${t.id}`)}
+            />
           ))
         )}
       </View>
@@ -117,14 +145,29 @@ export default function LibraryScreen() {
   );
 }
 
-function TutorialCard({ t, onPress }: { t: Tutorial; onPress: () => void }) {
+function TutorialCard({
+  t,
+  favorite,
+  onPress,
+}: {
+  t: Tutorial;
+  favorite: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
       <Card style={{ marginBottom: spacing.md }}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>{t.title}</Text>
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>{t.level}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {favorite && (
+              <Text style={{ color: colors.warn, fontSize: font.body, marginRight: spacing.xs }}>
+                ⭐
+              </Text>
+            )}
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{t.level}</Text>
+            </View>
           </View>
         </View>
         <Text style={styles.cardCat}>{t.category}</Text>
