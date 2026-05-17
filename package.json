@@ -15,7 +15,7 @@
     "@expo/metro-runtime": "~4.0.1",
     "@expo/vector-icons": "~14.0.4",
     "@react-native-async-storage/async-storage": "1.23.1",
-    "@react-native-community/slider": "^5.2.0",
+    "@react-native-community/slider": "4.5.5",
     "dayjs": "^1.11.13",
     "expo": "^52.0.49",
     "expo-av": "~15.0.2",
@@ -54,5 +54,18 @@
     "canvas": "^3.2.3",
     "typescript": "~5.3.3"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-chart-kit",
+          "expo-av",
+          "patch-package",
+          "postinstall-postinstall"
+        ],
+        "listUnknownPackages": false
+      }
+    }
+  }
 }

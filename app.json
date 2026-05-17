@@ -28,11 +28,6 @@
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#10B981"
       },
-      "navigationBar": {
-        "visible": "sticky",
-        "backgroundColor": "#0B1220",
-        "barStyle": "light-content"
-      },
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
