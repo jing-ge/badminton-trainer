@@ -15,7 +15,7 @@ import { vibrateLight } from '@/utils/haptics';
 import type { Plan } from '@/data/planTypes';
 
 // v0.13.0：集中维护 App 版本号，从 app.json 拉
-const APP_VERSION = Constants.expoConfig?.version ?? '0.13.0';
+const APP_VERSION = Constants.expoConfig?.version ?? '—';
 
 const NICKNAME_KEY = 'prefs.nickname';
 const LEVEL_KEY = 'prefs.level';
@@ -114,15 +114,7 @@ export default function MeScreen() {
     {
       label: '关于本应用',
       emoji: 'ℹ️',
-      onPress: () =>
-        Alert.alert(
-          `羽毛球私教 v${APP_VERSION}`,
-          [
-            '• 完全本地存储，无任何网络上传',
-            '• 基于 Expo SDK 52 + React Native 0.76',
-            '• 离线可用，地下球馆也能跑',
-          ].join('\n'),
-        ),
+      onPress: () => router.push('/about' as never),
     },
     {
       label: '清空所有数据',

@@ -109,6 +109,22 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.30.0 · 2026-05-17
+
+- **产品需求**：「关于本应用」实页化。
+- **开发改动**：
+  - `app/about.tsx`：新建实页，包含 Hero（徽标/应用名/大字版本号/圆点）、隐私承诺 3 条 bullet 卡、技术栈（Expo/RN/App 版本）卡、底部声明与返回按钮，全面应用 `src/theme/tokens`。
+  - `app/_layout.tsx`：注册 `about` 路由。
+  - `app/(tabs)/me.tsx`：「关于本应用」入口不再弹 Alert，改为 `router.push('/about')`，统一提取全局 `APP_VERSION`。
+  - `app.json` / `package.json`：同步提升版本至 v0.30.0。
+- **测试结论**：
+  - ✅ Hero 区域排版（🏸 + 沉浸式羽毛球私教 + v0.30.0 + 绿圆点）正确。
+  - ✅ 隐私承诺 3 条文案及技术栈各项对齐。
+  - ✅ 版本号由 `Constants.expoConfig?.version ?? '—'` 取值，摒弃旧版本号 0.13.0 硬编码。
+  - ✅ 主题色全线切为 tokens (无独立 HEX)。
+  - ✅ `me.tsx` 中关于跳转 `router.push('/about')` 准确执行。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.29.0 · 2026-05-17
 
 - **产品需求**：体能训练页升级（难度徽章 + 今日推荐 hero + 信息密度）。
