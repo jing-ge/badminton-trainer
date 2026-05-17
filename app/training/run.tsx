@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Platform, Pressable, StyleSheet, Text, View, ImageBackground } from 'react-native';
+import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { Audio, Video, ResizeMode } from 'expo-av';
@@ -104,6 +105,10 @@ export default function TrainingRunScreen() {
   // 拖拽进度条时,用 dragging 屏蔽真实 setTimeLeft 节流避免 timer 重建
   const [dragValue, setDragValue] = useState<number | null>(null);
   const [currentItemDurationSec, setCurrentItemDurationSec] = useState(0); // 当前项总时长(应用 conditionScale 后),用于进度条
+
+  // v0.32 暂停遮罩：进入 paused 才起 1s 计时器累加显示，恢复/卸载清掉，不跨多次累计
+  const [pausedElapsedSec, setPausedElapsedSec] = useState(0);
+  const pausedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -432,6 +437,28 @@ export default function TrainingRunScreen() {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = null;
   }
+
+  // v0.32 暂停遮罩：进入 paused 起秒表（不累计跨多次），恢复 / unmount 清零
+  useEffect(() => {
+    if (status !== 'paused') {
+      if (pausedTimerRef.current) {
+        clearInterval(pausedTimerRef.current);
+        pausedTimerRef.current = null;
+      }
+      setPausedElapsedSec(0);
+      return;
+    }
+    const startAt = Date.now();
+    pausedTimerRef.current = setInterval(() => {
+      setPausedElapsedSec(Math.floor((Date.now() - startAt) / 1000));
+    }, 1000);
+    return () => {
+      if (pausedTimerRef.current) {
+        clearInterval(pausedTimerRef.current);
+        pausedTimerRef.current = null;
+      }
+    };
+  }, [status]);
 
   function speak(text: string, rate: number = 1.0) {
     Speech.stop();
@@ -986,6 +1013,41 @@ export default function TrainingRunScreen() {
               拖动可直接调整剩余时间
             </Text>
           </View>
+
+          {/* v0.32 暂停遮罩：盖住动画/timer/slider，让用户聚焦"继续/跳过/结束"三选一 */}
+          {status === 'paused' && (
+            <Reanimated.View
+              entering={FadeIn.duration(180)}
+              exiting={FadeOut.duration(120)}
+              style={styles.pauseOverlay}
+              pointerEvents="box-none"
+            >
+              <Text style={styles.pauseEmoji}>⏸</Text>
+              <Text style={styles.pauseTitle}>训练已暂停</Text>
+              <Text style={styles.pauseElapsed}>已暂停 {fmtTime(pausedElapsedSec)}</Text>
+              <View style={styles.pauseActions}>
+                <Pressable
+                  onPress={() => {
+                    vibrateLight();
+                    togglePause();          // 先恢复，遮罩淡出
+                    nextItemManually();     // 复用现有 Alert / web confirm 确认逻辑
+                  }}
+                  style={({ pressed }) => [styles.pauseBtnGhost, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={styles.pauseBtnGhostText}>⏭ 跳过此项</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    vibrateMedium();
+                    exitWorkout();          // 复用现有跨端确认
+                  }}
+                  style={({ pressed }) => [styles.pauseBtnDanger, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={styles.pauseBtnDangerText}>🛑 结束训练</Text>
+                </Pressable>
+              </View>
+            </Reanimated.View>
+          )}
         </View>
 
         <View style={styles.bottomArea}>
@@ -1149,5 +1211,34 @@ const styles = StyleSheet.create({
   recentBanner: { color: colors.textDim, fontSize: font.tiny, marginBottom: spacing.sm, textAlign: 'center' },
   scaledTimeText: { color: colors.primary, fontSize: font.small, marginTop: spacing.sm, fontWeight: '600', textAlign: 'center' },
   startBtnSubText: { color: 'rgba(255,255,255,0.7)', fontSize: font.tiny, marginTop: 4, textAlign: 'center' },
+  // v0.32 暂停遮罩：colors.bg(#0B1220) 78% 半透明，铺满 mainBox 区域
+  pauseOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(11, 18, 32, 0.78)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.lg,
+    zIndex: 20,
+  },
+  pauseEmoji: { fontSize: 56 },
+  pauseTitle: { color: colors.text, fontSize: font.h2, fontWeight: '700' },
+  pauseElapsed: { color: colors.warn, fontSize: font.h3, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  pauseActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl },
+  pauseBtnGhost: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: 'transparent',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: radius.pill,
+  },
+  pauseBtnGhostText: { color: colors.textDim, fontSize: font.small },
+  pauseBtnDanger: {
+    backgroundColor: colors.danger,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: radius.pill,
+  },
+  pauseBtnDangerText: { color: '#FFFFFF', fontSize: font.small, fontWeight: '600' },
 });
 

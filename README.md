@@ -109,6 +109,20 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.32.0 · 2026-05-17
+
+- **产品需求**：训练 run 页暂停遮罩 + 快速决策按钮。
+- **开发改动**：
+  - `app/training/run.tsx`：新增 status 为 'paused' 时的全屏半透明遮罩 (`rgba(11,18,32,0.78)`)，覆盖在动画与 timer 之上，不遮盖 topBar 和 bottomArea；新增 `pausedElapsedSec` 计时状态记录真实暂停时间并附带 `FadeIn` / `FadeOut` 动画效果；遮罩居中呈现「训练已暂停」及已暂停时间；增加「跳过此项」和「结束训练」双操作按钮直接复用原有判断退出/跳过逻辑。
+  - `package.json` & `app.json`：提升版本号至 v0.32.0。
+- **测试结论**：
+  - ✅ 遮罩样式 `absoluteFillObject`、`zIndex: 20` 并放置于 `mainBox` 内，不影响外围 bar 的响应及呈现。
+  - ✅ `pausedElapsedSec` 在状态切入/切出 `paused` 时正确从 0 开始计时并清零，无内存泄漏与多次累加风险。
+  - ✅ Reanimated 组件 `FadeIn` 与 `FadeOut` 使用无误，未污染原有 RN Animated API。
+  - ✅ 按钮样式 Ghost（border+textDim）与 Danger（红底白字）实现准确，并且触发后原有打断功能调用正常（不会在原有功能之上再次叠加 Alert）。
+  - ✅ 期间由于 status 是 `paused`，BGM 会正常静音且不播报教练音频。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.31.0 · 2026-05-17
 
 - **产品需求**：教程详情页 CTA 修复 + Section 顺序优化 + GripGuide 副文案。
