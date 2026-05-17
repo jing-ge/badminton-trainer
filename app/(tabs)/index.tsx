@@ -271,27 +271,84 @@ export default function HomeScreen() {
           </View>
           <Text style={{ color: colors.textDim, fontSize: 22 }}>›</Text>
         </Pressable>
+        {recent.length > 0 && (
+          <Pressable
+            onPressIn={vibrateLight}
+            onPress={() => router.push('/(tabs)/stats')}
+            style={({ pressed }) => [
+              styles.quickWide,
+              { marginTop: spacing.sm, opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Text style={{ fontSize: 28 }}>📒</Text>
+            <View style={{ flex: 1, marginLeft: spacing.md }}>
+              <Text style={styles.quickLabel}>训练记录</Text>
+              <Text style={styles.quickDesc}>查看全部历史训练日志与详情</Text>
+            </View>
+            <Text style={{ color: colors.textDim, fontSize: 22 }}>›</Text>
+          </Pressable>
+        )}
       </Section>
 
       {recent.length > 0 && (
         <Section title="最近训练">
-          {recent.map((r) => {
+          {recent.map((r, idx) => {
             const stars = Math.max(0, Math.min(5, r.intensity));
+            // 仅第一条、且与第二条非同日时显示"上次对照"
+            let diffText: string | null = null;
+            let diffColor: string = colors.textDim;
+            if (idx === 0 && recent.length >= 2 && recent[0].date !== recent[1].date) {
+              const n = Math.abs(
+                Math.round(recent[0].duration_min - recent[1].duration_min),
+              );
+              if (n === 0) {
+                diffText = '→ 与上次相同';
+                diffColor = colors.textDim;
+              } else if (recent[0].duration_min > recent[1].duration_min) {
+                diffText = `↗ 比上次多 ${n} 分钟`;
+                diffColor = colors.primary;
+              } else {
+                diffText = `↘ 比上次少 ${n} 分钟`;
+                diffColor = colors.warn;
+              }
+            }
             return (
-              <Card key={r.id} style={{ marginBottom: spacing.sm }}>
-                <View style={styles.recentRow}>
-                  <View>
-                    <Text style={styles.recentDate}>{r.date}</Text>
-                    <Text style={styles.recentMeta}>
-                      {r.duration_min} 分钟 · {r.categories.join('、') || '综合'}
+              <Pressable
+                key={r.id}
+                onPressIn={vibrateLight}
+                onPress={() => router.push({ pathname: '/log/[id]', params: { id: String(r.id) } })}
+                style={({ pressed }) => [
+                  { marginBottom: spacing.sm, opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Card>
+                  <View style={styles.recentRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.recentDate}>{r.date}</Text>
+                      <Text style={styles.recentMeta}>
+                        {r.duration_min} 分钟 · {r.categories.join('、') || '综合'}
+                      </Text>
+                      {diffText && (
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            color: diffColor,
+                            fontSize: font.tiny,
+                            marginTop: 2,
+                          }}
+                        >
+                          {diffText}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.intensity}>
+                      {'★'.repeat(stars)}
+                      {'☆'.repeat(5 - stars)}
                     </Text>
+                    <Text style={{ color: colors.textDim, fontSize: 22 }}>›</Text>
                   </View>
-                  <Text style={styles.intensity}>
-                    {'★'.repeat(stars)}
-                    {'☆'.repeat(5 - stars)}
-                  </Text>
-                </View>
-              </Card>
+                </Card>
+              </Pressable>
             );
           })}
         </Section>
@@ -353,8 +410,8 @@ const styles = StyleSheet.create({
   quickDesc: { color: colors.textDim, fontSize: font.small, marginTop: 2 },
   recentRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
   },
   recentDate: { color: colors.text, fontWeight: '600' },
   recentMeta: { color: colors.textDim, fontSize: font.small, marginTop: 2 },
