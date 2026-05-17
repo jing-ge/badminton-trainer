@@ -109,6 +109,25 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.28.0 · 2026-05-17
+
+- **产品需求**：训练日志详情页 + 备注就地编辑。
+- **开发改动**：
+  - `app/(tabs)/stats.tsx`：历史卡片外层包裹 Pressable，点击带震动反馈并路由 push 至 `/log/[id]`。
+  - `app/log/[id].tsx`：新建训练详情页，包含日期时间、核心指标（时长/强度）、训练内容（分类 chip / 计划回显）、对手卡战绩（win/loss/draw 对应颜色与表情）、可就地编辑的三态备注区（空态/展示态/编辑态）。
+  - `src/db/trainingLogs.ts`：新增 `updateTrainingLogNote`，支持单字段 UPDATE，对空字符串做 null 归一化。
+  - `app/_layout.tsx`：注册 `log/[id]` 详情页路由。
+  - `package.json`：提升版本号至 v0.28.0。
+- **测试结论**：
+  - ✅ 历史记录列表转 Pressable，跳转携带正确 ID。
+  - ✅ 详情页各模块（大日期、指标卡、分类 chip、计划 title）兜底逻辑严密。
+  - ✅ 对手卡按 opponent 存在与否正常显隐，且 win/loss/draw 渲染正确。
+  - ✅ 备注三态切换（包含 maxLength=200 和 null 归一化）验证通过。
+  - ✅ 跨端删除二次确认框区分 Web / Native 逻辑，删除后自动 `router.back()`。
+  - ✅ 异常 ID 兜底空态卡及 "返回" 按钮生效。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
+
 ### v0.27.0 · 2026-05-17
 
 - **产品需求**：录像复盘详情页 `app/replay/[id].tsx` 升级为"快速标注台"（预设 chip、视频自动暂停、时间微调胶囊、删除二次确认、空态引导卡）。

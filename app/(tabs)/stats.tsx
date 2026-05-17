@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { useAnimatedProps, useSharedValue, withTiming, Easing } from 'react-native-reanimated';
 import dayjs from 'dayjs';
+import { router } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Section } from '@/components/Section';
@@ -369,29 +370,38 @@ export default function StatsScreen() {
         ) : (
           <>
             {visibleLogs.map((l) => (
-              <Card key={l.id} style={{ marginBottom: spacing.sm }}>
-                <View style={styles.logRow}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.logDate}>{l.date}</Text>
-                      {l.match_result === 'win' && <Text style={{ fontSize: 12 }}>🏆</Text>}
-                      {l.match_result === 'loss' && <Text style={{ fontSize: 12 }}>💔</Text>}
+              <Pressable
+                key={l.id}
+                onPress={() => {
+                  vibrateLight();
+                  router.push({ pathname: '/log/[id]', params: { id: String(l.id) } });
+                }}
+                style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Card style={{ marginBottom: spacing.sm }}>
+                  <View style={styles.logRow}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.logDate}>{l.date}</Text>
+                        {l.match_result === 'win' && <Text style={{ fontSize: 12 }}>🏆</Text>}
+                        {l.match_result === 'loss' && <Text style={{ fontSize: 12 }}>💔</Text>}
+                      </View>
+                      <Text style={styles.logCat}>
+                        {l.categories.join('、') || '综合'}
+                        {l.opponent ? ` (vs ${l.opponent})` : ''}
+                      </Text>
+                      {l.note ? <Text style={styles.logNote}>📝 {l.note}</Text> : null}
                     </View>
-                    <Text style={styles.logCat}>
-                      {l.categories.join('、') || '综合'}
-                      {l.opponent ? ` (vs ${l.opponent})` : ''}
-                    </Text>
-                    {l.note ? <Text style={styles.logNote}>📝 {l.note}</Text> : null}
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.logMins}>{l.duration_min} 分钟</Text>
+                      <Text style={styles.logStar}>
+                        {'★'.repeat(l.intensity)}
+                        {'☆'.repeat(5 - l.intensity)}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.logMins}>{l.duration_min} 分钟</Text>
-                    <Text style={styles.logStar}>
-                      {'★'.repeat(l.intensity)}
-                      {'☆'.repeat(5 - l.intensity)}
-                    </Text>
-                  </View>
-                </View>
-              </Card>
+                </Card>
+              </Pressable>
             ))}
             {logs.length > HISTORY_INITIAL && (
               <Pressable

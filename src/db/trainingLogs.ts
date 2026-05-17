@@ -73,6 +73,16 @@ export async function deleteTrainingLog(id: number) {
   await db.runAsync(`DELETE FROM training_logs WHERE id = ?`, [id]);
 }
 
+// v0.28.0 — 详情页就地编辑备注用：单字段更新，复用现有 note 列
+export async function updateTrainingLogNote(id: number, note: string): Promise<void> {
+  const db = await getDB();
+  const trimmed = note.trim();
+  await db.runAsync(
+    `UPDATE training_logs SET note = ? WHERE id = ?`,
+    [trimmed.length > 0 ? trimmed : null, id],
+  );
+}
+
 export async function getDailyMinutes(days = 14) {
   const db = await getDB();
   const since = dayjs().subtract(days - 1, 'day').format('YYYY-MM-DD');
