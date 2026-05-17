@@ -109,6 +109,19 @@ npx eas-cli build -p android --profile preview
 
 <!-- ITERATION_LOG_START -->
 
+### v0.31.0 · 2026-05-17
+
+- **产品需求**：教程详情页 CTA 修复 + Section 顺序优化 + GripGuide 副文案。
+- **开发改动**：
+  - `app/tutorial/[id].tsx`：修正主 CTA 路由为 `/train` 并附带 vibrateMedium，修正次要链接为 `/training/log` 并附带 vibrateLight，清理了残留的 `/pose` 路由；重排 Section 顺序为“错误 → 要点 → 自检”；在标题上添加 `· N 条` 数字角标；GripGuide 新增副文案并应用了 spacing。
+  - `package.json` & `app.json`：提升版本号至 v0.31.0。
+- **测试结论**：
+  - ✅ grep `/pose` 路由完全清退，主次 CTA 跳转正确并携带震动。
+  - ✅ Section 顺序纠错、正向、自查逻辑合理，角标渲染精确应用了 tabular-nums。
+  - ✅ GripGuide 副文案提示准确并在视觉上成组。
+  - ✅ 版本号已更新至 v0.31.0。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.30.0 · 2026-05-17
 
 - **产品需求**：「关于本应用」实页化。

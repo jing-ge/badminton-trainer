@@ -101,54 +101,66 @@ export default function TutorialDetail() {
         </View>
       ) : null}
 
-      {/* 新增：持拍法图解 */}
+      {/* 持拍法图解：与上方 TutorialMedia 视觉成组，加副文案给出上下文 */}
       {t.gripType && (
-        <View style={{ marginTop: spacing.lg }}>
-          <Text style={styles.section}>🏸 关键持拍法</Text>
+        <View style={{ marginTop: spacing.md }}>
+          <Text style={[styles.section, { marginBottom: 0 }]}>🏸 关键持拍法</Text>
+          <Text style={styles.gripHint}>{t.title} 全程保持此持拍，发力前再快速切换</Text>
           <GripGuide type={t.gripType} />
         </View>
       )}
 
-      <Card style={{ marginTop: spacing.lg }}>
-        <Text style={styles.section}>✅ 动作要点</Text>
-        {t.keyPoints.map((p, i) => (
-          <View key={i} style={styles.row}>
-            <Text style={styles.dot}>{i + 1}</Text>
-            <Text style={styles.text}>{p}</Text>
-          </View>
-        ))}
-      </Card>
-
-      <Card style={{ marginTop: spacing.md }}>
-        <Text style={[styles.section, { color: colors.danger }]}>⚠️ 常见错误</Text>
-        {t.commonMistakes.map((m, i) => (
-          <View key={i} style={styles.row}>
-            <Text style={[styles.dot, { color: colors.danger }]}>×</Text>
-            <Text style={styles.text}>{m}</Text>
-          </View>
-        ))}
-      </Card>
-
-      <Card style={{ marginTop: spacing.md }}>
-        <Text style={[styles.section, { color: colors.accent }]}>🔍 自检要点</Text>
-        {t.checkpoints.map((c, i) => (
-          <View key={i} style={styles.row}>
-            <Text style={[styles.dot, { color: colors.accent }]}>?</Text>
-            <Text style={styles.text}>{c}</Text>
-          </View>
-        ))}
-      </Card>
+      {/* Section 顺序：错误 → 要点 → 自检（先纠错，再正向，再自查） */}
+      {renderSection('⚠️', '常见错误', colors.danger, '×', t.commonMistakes, spacing.lg)}
+      {renderSection('✅', '动作要点', colors.primary, undefined, t.keyPoints, spacing.md)}
+      {renderSection('🔍', '自检要点', colors.accent, '?', t.checkpoints, spacing.md)}
 
       <Pressable
-        onPress={() => router.push({ pathname: '/pose', params: { tutorial: t.id } })}
-        style={({ pressed }) => [
-          styles.cta,
-          { opacity: pressed ? 0.8 : 1 },
-        ]}
+        onPress={() => {
+          vibrateMedium();
+          router.push('/train');
+        }}
+        style={({ pressed }) => [styles.cta, { opacity: pressed ? 0.8 : 1 }]}
       >
-        <Text style={styles.ctaText}>📷 用动作识别检查我的{t.title}</Text>
+        <Text style={styles.ctaText}>🚀 开练 · 去训练 Tab</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => {
+          vibrateLight();
+          router.push('/training/log');
+        }}
+        hitSlop={8}
+        style={styles.secondaryLinkWrap}
+      >
+        <Text style={styles.secondaryLink}>📝 直接打个卡 →</Text>
       </Pressable>
     </Screen>
+  );
+}
+
+/** 单个 Section 卡片：标题 "<emoji> <name>  · N 条" 单行，N 用 tabular-nums 小字。
+ *  抽出来是因为三个 Section 结构完全一致，三遍 JSX 噪音太大。 */
+function renderSection(
+  emoji: string,
+  name: string,
+  color: string,
+  dotOverride: string | undefined,
+  items: string[],
+  marginTop: number,
+) {
+  return (
+    <Card style={{ marginTop }}>
+      <Text style={[styles.section, { color }]}>
+        {emoji} {name}
+        <Text style={[styles.sectionCount, { color }]}>{`  · ${items.length} 条`}</Text>
+      </Text>
+      {items.map((it, i) => (
+        <View key={i} style={styles.row}>
+          <Text style={[styles.dot, { color }]}>{dotOverride ?? i + 1}</Text>
+          <Text style={styles.text}>{it}</Text>
+        </View>
+      ))}
+    </Card>
   );
 }
 
@@ -164,6 +176,14 @@ const styles = StyleSheet.create({
   },
   favIcon: { fontSize: 28, fontWeight: '700' },
   section: { color: colors.primary, fontWeight: '700', fontSize: font.h3, marginBottom: spacing.md },
+  sectionCount: { fontSize: font.small, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  gripHint: { color: colors.textDim, fontSize: font.small, marginTop: 2, marginBottom: spacing.md },
+  secondaryLinkWrap: { alignSelf: 'center', marginTop: spacing.md, paddingVertical: spacing.sm },
+  secondaryLink: {
+    color: colors.textDim,
+    fontSize: font.small,
+    textDecorationLine: 'underline',
+  },
   row: { flexDirection: 'row', marginBottom: spacing.md, gap: spacing.md },
   dot: { color: colors.primary, fontWeight: '800', fontSize: font.body, width: 20 },
   text: { color: colors.text, flex: 1, fontSize: font.body, lineHeight: 22 },
