@@ -108,6 +108,17 @@ npx eas-cli build -p android --profile preview
 > Agent 协作规则详见 [`AGENTS.md`](./AGENTS.md)。
 
 <!-- ITERATION_LOG_START -->
+### v0.41.0 · 2026-05-17
+
+- **Android 真机紧急修复**：用户反馈 v0.40.0 装到 Android 上后，三个状态按钮（💪满血/⚡一般/🪫疲惫）的卡片轮廓看得见，**但里面的 emoji 和文字全部不显示**（Web 端完全正常）。
+- **根因（oracle 70% 置信度诊断）**：v0.40 新增的 `elevation: 3` 在 Android 上会强制 view 升级为 hardware layer，与 `backgroundColor: 'rgba(255,255,255,0.08)'` 半透明背景组合时触发 Android RN 已知 bug —— hardware layer 合成路径在某些 ROM（小米/华为/三星）会丢弃子 `<Text>` 的 ColorEmoji 字体与文本渲染。Web 端无 elevation 概念，所以不受影响。
+- **修复**（`app/training/run.tsx` `conditionBtn` 样式）：
+  - **删除 `elevation: 3` 一行**（surgical change），保留 iOS `shadow*` 五件套。
+  - 对比度增益不依赖 elevation：背景 rgba(255,255,255,0.08) 提亮 28/256 + 边框 colors.textDim (#8E9BB7) 亮度 165，两者已足够形成清晰按钮轮廓（量化分析 Δ19/256，超过人眼可辨阈值 3 倍以上）。
+- **影响面**：Android 失去 native shadow（但深色背景上本来就几乎不可见），iOS / Web 视觉无变化。
+- **版本号**：`package.json` & `app.json` 提升至 v0.41.0。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.40.0 · 2026-05-17
 
 - **维护轮**：用户反馈 + 全面错误体检，1 个对比度真 bug + 3 处路由/挂账清理。

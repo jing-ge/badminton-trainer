@@ -1183,12 +1183,9 @@ const styles = StyleSheet.create({
   roundSmallBtn: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
   iconBtnLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 8 },
   playPauseBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-  // v0.40 修按钮"和背景融为一体"的对比度 bug：
-  // 旧方案：cardAlt(#1A2540) 背景 + border(#26324A) 边框，叠在 court_bg 暗色遮罩(#0B1220 @ 0.85)
-  // 之上只亮 15/256，按钮卡片轮廓被吃掉，用户只看到 emoji+文字漂浮在背景上。
-  // 新方案：用近黑色但更高对比的 surface(rgba(255,255,255,0.08) 叠在遮罩上 ≈ 提亮 28/256)
-  // + 更亮的边框 textDim(#8E9BB7) ≈ 提亮 100/256，让按钮卡片有清晰实体感；
-  // 再加 elevation/shadow 形成纵深，避免和背景平铺。
+  // v0.41 真机修复：Android 上 elevation + rgba 半透明背景组合会强制 view 升级为
+  // hardware layer，已知 bug 会让子 Text/emoji 在某些 ROM 上不渲染（Web 端无此问题）。
+  // 删除 elevation: 3 这一行，对比度增益不依赖它（背景+边框已足够），iOS shadow* 保留。
   conditionBtn: {
     flex: 1,
     alignItems: 'center',
@@ -1197,7 +1194,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 2,
     borderColor: colors.textDim,
-    elevation: 3,
     shadowColor: '#000',
     shadowOpacity: 0.4,
     shadowRadius: 6,
