@@ -303,7 +303,7 @@ export default function StatsScreen() {
         />
         <PeriodKPI
           label="平均强度"
-          prefix="★ "
+          prefix="🔥 "
           current={periodStats.cur.hasData ? periodStats.cur.avgIntensity : null}
           previous={periodStats.prev.hasData ? periodStats.prev.avgIntensity : null}
           prevLabel={periodStats.prevLabel}

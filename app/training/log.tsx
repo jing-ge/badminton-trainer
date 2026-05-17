@@ -102,11 +102,11 @@ export default function TrainingLogScreen() {
 
     if (Platform.OS === 'web') {
       window.alert(`打卡成功！\n${cheer}`);
-      router.replace('/stats');
+      router.replace('/(tabs)/stats');
       return;
     }
     Alert.alert('打卡成功！', cheer, [
-      { text: '好', onPress: () => router.replace('/stats') },
+      { text: '好', onPress: () => router.replace('/(tabs)/stats') },
     ]);
   }
 

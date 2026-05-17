@@ -108,6 +108,25 @@ npx eas-cli build -p android --profile preview
 > Agent 协作规则详见 [`AGENTS.md`](./AGENTS.md)。
 
 <!-- ITERATION_LOG_START -->
+### v0.40.0 · 2026-05-17
+
+- **维护轮**：用户反馈 + 全面错误体检，1 个对比度真 bug + 3 处路由/挂账清理。
+
+- **关键修复 1 · 训练 idle 按钮"和背景重合"真修复**：
+  - v0.26 曾尝试用 `colors.cardAlt` + `colors.border` 提升对比度，但叠在 court_bg 暗遮罩 (`rgba(11,18,32,0.85)` ≈ 亮度 24/256) 之上，按钮表面仅亮 15/256，肉眼仍与背景融为一片，用户仍报"看不见三个框"。
+  - 本轮 `conditionBtn` 背景改为 `rgba(255,255,255,0.08)`（叠后 ≈ 亮度 43，对比度提升 3 倍）；边框改为 `colors.textDim` (#8E9BB7，亮度 165)；新增 `elevation: 3` + iOS shadow 形成纵深。
+  - 选中态背景改为 `rgba(16,185,129,0.32)` 半透明绿，配合 primary 边框，让"已选中"有实体感而不仅是细微边框色差。
+- **关键修复 2 · 路由清理**：
+  - `_layout.tsx` 删除指向不存在文件的死路由 `training/[id]`；
+  - `_layout.tsx` 补注册 `settings/voice`（v0.24 创建后一直未注册，me.tsx 用 `as never` 绕过类型检查）；
+  - `training/log.tsx` 两处 `router.replace('/stats')` 规范化为 `/(tabs)/stats`，与项目其它跳转保持一致。
+- **关键修复 3 · v0.39 挂账清理**：
+  - `stats.tsx` 平均强度 KPI `prefix="★ "` 改为 `"🔥 "`，与卡片层 `INTENSITY_META` 高强度 emoji 对齐，PRD 要求 grep `★` 在 stats.tsx 应 0 命中达成。
+- **全面体检结论**：
+  - ✅ `tsc --noEmit` 通过；`expo-doctor` 17/17 通过；TS strict 启用，无 `as any` / `@ts-ignore`；Web 端 fallback 完整。
+  - ⚠️ 已知挂账（暂不修）：首页/详情页/教程页仍用 ★ 显示强度（设计语言割裂，下一版统一）；`expo-camera`/`react-native-chart-kit` 未使用依赖（需 build 验证后再剔）。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.39.0 · 2026-05-17
 
 - **产品需求**：stats Tab 历史记录区升级为「私教训练流水」（按月分组 + 信息密度升级 + 筛选 Pill）。

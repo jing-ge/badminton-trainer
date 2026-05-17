@@ -37,7 +37,6 @@ export default function RootLayout() {
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="pose/index" options={{ title: '动作识别' }} />
-          <Stack.Screen name="training/[id]" options={{ title: '训练详情' }} />
           <Stack.Screen name="training/today" options={{ title: '今日训练' }} />
           <Stack.Screen name="training/run" options={{ title: '训练中', headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen name="training/module/[id]" options={{ title: '训练模块' }} />
@@ -53,6 +52,7 @@ export default function RootLayout() {
           <Stack.Screen name="log/[id]" options={{ title: '训练详情' }} />
           <Stack.Screen name="about" options={{ title: '关于' }} />
           <Stack.Screen name="settings/reset" options={{ title: '清空数据' }} />
+          <Stack.Screen name="settings/voice" options={{ title: '语音设置' }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

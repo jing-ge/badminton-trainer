@@ -1183,8 +1183,30 @@ const styles = StyleSheet.create({
   roundSmallBtn: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
   iconBtnLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 8 },
   playPauseBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-  conditionBtn: { flex: 1, alignItems: 'center', backgroundColor: colors.cardAlt, padding: spacing.md, borderRadius: radius.md, borderWidth: 2, borderColor: colors.border },
-  conditionBtnActive: { borderColor: colors.primary, backgroundColor: colors.cardAlt },
+  // v0.40 修按钮"和背景融为一体"的对比度 bug：
+  // 旧方案：cardAlt(#1A2540) 背景 + border(#26324A) 边框，叠在 court_bg 暗色遮罩(#0B1220 @ 0.85)
+  // 之上只亮 15/256，按钮卡片轮廓被吃掉，用户只看到 emoji+文字漂浮在背景上。
+  // 新方案：用近黑色但更高对比的 surface(rgba(255,255,255,0.08) 叠在遮罩上 ≈ 提亮 28/256)
+  // + 更亮的边框 textDim(#8E9BB7) ≈ 提亮 100/256，让按钮卡片有清晰实体感；
+  // 再加 elevation/shadow 形成纵深，避免和背景平铺。
+  conditionBtn: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: colors.textDim,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  conditionBtnActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(16,185,129,0.32)',
+  },
   conditionText: { color: colors.text, fontWeight: '700', fontSize: font.h3, marginTop: spacing.sm },
   conditionDesc: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
   badgeWrap: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(245, 158, 11, 0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.warn, shadowColor: colors.warn, shadowOpacity: 0.8, shadowRadius: 20, shadowOffset: { width: 0, height: 0 } },
