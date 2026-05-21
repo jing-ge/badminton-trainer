@@ -108,6 +108,15 @@ npx eas-cli build -p android --profile preview
 > Agent 协作规则详见 [`AGENTS.md`](./AGENTS.md)。
 
 <!-- ITERATION_LOG_START -->
+### v0.46.0 · 2026-05-21
+
+本轮聚焦**首页上半部分瘦身**——hero + StreakBadgeCard 之前占去近 200px 把今日训练卡推到折叠线下，小屏机看不到「开始训练」按钮。
+
+- **hero 收窄**：`app/(tabs)/index.tsx` greet 字号 `h1(28)` → `h2(22)`、加 `numberOfLines={1}`；date 去掉「YYYY 年」前缀，marginTop 4→2；hero marginBottom `lg(16)` → `md(12)`。
+- **StreakBadgeCard 紧凑化**：`src/features/streak/StreakBadgeCard.tsx` Card 内 padding 由默认 `lg(16)` 覆盖为 `md(12)`、cardWrap marginBottom `lg(16)` → `md(12)`、title 字号 `h3(18)` → `body(15)`、subtitle 字号 `small(13)` → `tiny(11)` 且 `numberOfLines` 由 2 收为 1、CTA padding 10/18 → 8/16 文字 `small`、progressBlock marginTop 缩半。
+- **效果**：hero + streak 块从 ~190-220px 压到 ~145-165px，今日训练 Card 与「🚀 开始今日训练」按钮在 6.1" 屏上能完整露出，无需先滚。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.45.0 · 2026-05-21
 
 本轮聚焦**绕开 Android 系统 TTS 机械音 + 数据可携带**——直接消化 v0.42 留下的两个根因痛点（keystore 换签名清数据 / TTS 引擎差异）。

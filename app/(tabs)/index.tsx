@@ -119,8 +119,10 @@ export default function HomeScreen() {
       />
 
       <View style={styles.hero}>
-        <Text style={styles.greet}>{getGreeting()}，准备训练了吗？</Text>
-        <Text style={styles.date}>{dayjs().format('YYYY 年 M 月 D 日 dddd')}</Text>
+        <Text style={styles.greet} numberOfLines={1}>
+          {getGreeting()}，准备训练了吗？
+        </Text>
+        <Text style={styles.date}>{dayjs().format('M 月 D 日 dddd')}</Text>
       </View>
 
       {streakStats && (
@@ -388,9 +390,9 @@ function getGreeting() {
 }
 
 const styles = StyleSheet.create({
-  hero: { marginBottom: spacing.lg },
-  greet: { color: colors.text, fontSize: font.h1, fontWeight: '700' },
-  date: { color: colors.textDim, marginTop: 4, fontSize: font.small },
+  hero: { marginBottom: spacing.md },
+  greet: { color: colors.text, fontSize: font.h2, fontWeight: '700' },
+  date: { color: colors.textDim, marginTop: 2, fontSize: font.small },
   switchChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: 6,

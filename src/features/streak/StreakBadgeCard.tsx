@@ -199,7 +199,7 @@ export function StreakBadgeCard({
             >
               {view.title}
             </Text>
-            <Text style={styles.subtitle} numberOfLines={2}>
+            <Text style={styles.subtitle} numberOfLines={1}>
               {view.subtitle}
             </Text>
           </View>
@@ -286,11 +286,11 @@ function ProgressBar({
 
 const styles = StyleSheet.create({
   cardWrap: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     borderRadius: radius.lg,
   },
   card: {
-    // Card 自带 border，A 状态由 wrapper 覆盖；其它状态保持默认
+    padding: spacing.md,
   },
   row: {
     flexDirection: 'row',
@@ -298,19 +298,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   textCol: { flex: 1, marginRight: spacing.md },
-  title: { fontSize: font.h3, fontWeight: '800' },
+  title: { fontSize: font.body, fontWeight: '800' },
   subtitle: {
     color: colors.textDim,
-    fontSize: font.small,
-    marginTop: 4,
+    fontSize: font.tiny,
+    marginTop: 2,
   },
   cta: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: radius.pill,
   },
-  ctaText: { color: '#fff', fontWeight: '700' },
-  progressBlock: { marginTop: spacing.md },
+  ctaText: { color: '#fff', fontWeight: '700', fontSize: font.small },
+  progressBlock: { marginTop: spacing.sm },
   barBg: {
     height: 6,
     borderRadius: 3,
