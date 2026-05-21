@@ -110,6 +110,7 @@ export default function MeScreen() {
   const items: { label: string; emoji: string; onPress: () => void; danger?: boolean }[] = [
     { label: '训练日程提醒', emoji: '🔔', onPress: () => router.push('/schedule') },
     { label: '语音设置', emoji: '🔊', onPress: () => router.push('/settings/voice' as never) },
+    { label: '备份与恢复', emoji: '💾', onPress: () => router.push('/settings/backup' as never) },
     {
       label: '关于本应用',
       emoji: 'ℹ️',

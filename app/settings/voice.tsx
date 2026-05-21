@@ -7,6 +7,7 @@ import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { colors, font, radius, spacing } from '@/theme/tokens';
 import { vibrateLight } from '@/utils/haptics';
+import { playClip, unloadCoachAudio, type CoachClipName } from '@/features/run/coachAudio';
 
 // v0.25 试听文本：连贯句 + 训练实际倒数（单字断句）— 让设置页所听即训练所得
 const PREVIEW_TEXT = '准备开始训练。五。四。三。二。一。开始';
@@ -23,7 +24,15 @@ export default function VoiceSettings() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rate, setRate] = useState<number>(1.0);
   const [pitch, setPitch] = useState<number>(1.0);
+  const [useCoachAudio, setUseCoachAudio] = useState<boolean>(true);
   const [loaded, setLoaded] = useState(false);
+
+  // 离开页面时把预加载的 coach 音频清掉，下次进训练页再 lazy load
+  useEffect(() => {
+    return () => {
+      unloadCoachAudio().catch(() => {});
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -48,15 +57,17 @@ export default function VoiceSettings() {
             }));
           setVoices(zhVoices);
 
-          const [savedId, savedRate, savedPitch] = await Promise.all([
+          const [savedId, savedRate, savedPitch, savedUseAudio] = await Promise.all([
             AsyncStorage.getItem('prefs.ttsVoice'),
             AsyncStorage.getItem('prefs.ttsRate'),
             AsyncStorage.getItem('prefs.ttsPitch'),
+            AsyncStorage.getItem('prefs.useCoachAudio'),
           ]);
           if (cancelled) return;
           setSelectedId(savedId);
           if (savedRate) setRate(parseFloat(savedRate));
           if (savedPitch) setPitch(parseFloat(savedPitch));
+          if (savedUseAudio === '0') setUseCoachAudio(false);
           setLoaded(true);
         } catch {
           if (!cancelled) setLoaded(true);
@@ -110,10 +121,69 @@ export default function VoiceSettings() {
     Speech.speak('五。四。三。二。一', opts);
   }
 
+  // v0.44 切换"教练录音"开关
+  function toggleCoachAudio() {
+    const next = !useCoachAudio;
+    setUseCoachAudio(next);
+    vibrateLight();
+    AsyncStorage.setItem('prefs.useCoachAudio', next ? '1' : '0').catch(() => {});
+    if (next) previewCoachAudio();
+  }
+
+  // 播放真人音版的 5→1→开始 倒数预览
+  async function previewCoachAudio() {
+    Speech.stop();
+    const seq: CoachClipName[] = ['n5', 'n4', 'n3', 'n2', 'n1', 'start'];
+    for (const name of seq) {
+      const ok = await playClip(name);
+      if (!ok) break;
+      await new Promise((r) => setTimeout(r, 700));
+    }
+  }
+
   return (
     <Screen>
       <Text style={styles.title}>🔊 语音设置</Text>
       <Text style={styles.sub}>挑一个最自然的声音；点试听对比效果</Text>
+
+      <Card style={useCoachAudio ? { ...styles.coachCard, ...styles.coachCardActive } : styles.coachCard}>
+        <View style={styles.coachRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.coachLabel}>🎙 教练真人音（倒数 5→1 + 开始）</Text>
+            <Text style={styles.coachSub}>
+              {useCoachAudio
+                ? '已启用：高频倒数走本地音频，绕开系统 TTS 机械音'
+                : '已关闭：所有播报都走系统 TTS（受手机引擎限制）'}
+            </Text>
+          </View>
+          <Pressable
+            onPress={toggleCoachAudio}
+            style={({ pressed }) => [
+              styles.coachToggle,
+              useCoachAudio && styles.coachToggleOn,
+              { opacity: pressed ? 0.8 : 1 },
+            ]}
+          >
+            <View
+              style={[
+                styles.coachToggleKnob,
+                useCoachAudio && styles.coachToggleKnobOn,
+              ]}
+            />
+          </Pressable>
+        </View>
+        {useCoachAudio && (
+          <Pressable
+            onPress={previewCoachAudio}
+            style={({ pressed }) => [
+              styles.coachPreviewBtn,
+              { opacity: pressed ? 0.8 : 1 },
+            ]}
+          >
+            <Text style={styles.coachPreviewText}>▶️ 试听 5、4、3、2、1、开始</Text>
+          </Pressable>
+        )}
+      </Card>
 
       <Card style={styles.paramCard}>
         <View style={styles.paramRow}>
@@ -281,4 +351,37 @@ const styles = StyleSheet.create({
   empty: { color: colors.textDim, padding: spacing.md, lineHeight: 20 },
   tipTitle: { color: colors.text, fontSize: font.body, fontWeight: '700', marginBottom: spacing.sm },
   tipBody: { color: colors.textDim, fontSize: font.small, lineHeight: 22 },
+  // v0.44 教练真人音开关卡
+  coachCard: { marginTop: spacing.lg, borderWidth: 1, borderColor: colors.border },
+  coachCardActive: { borderColor: colors.primary },
+  coachRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  coachLabel: { color: colors.text, fontSize: font.body, fontWeight: '700' },
+  coachSub: { color: colors.textDim, fontSize: font.tiny, marginTop: 4, lineHeight: 18 },
+  coachToggle: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.border,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  coachToggleOn: { backgroundColor: colors.primary },
+  coachToggleKnob: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+  },
+  coachToggleKnobOn: { alignSelf: 'flex-end' },
+  coachPreviewBtn: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.cardAlt,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  coachPreviewText: { color: colors.primary, fontSize: font.small, fontWeight: '700' },
 });

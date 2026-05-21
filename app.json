@@ -2,7 +2,7 @@
   "expo": {
     "name": "羽毛球教练",
     "slug": "badminton-trainer",
-    "version": "0.42.0",
+    "version": "0.45.0",
     "orientation": "portrait",
     "scheme": "badminton",
     "userInterfaceStyle": "dark",
@@ -65,9 +65,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "84f7f226-6abf-4918-863b-23c8e034eea1"
+        "projectId": "0e008b1e-2f18-4830-ade5-c28b1b394946"
       }
     },
-    "owner": "jingjingjing777"
+    "owner": "jingjingjingjing"
   }
 }

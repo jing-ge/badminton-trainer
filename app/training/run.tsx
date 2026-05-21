@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Platform, Pressable, StyleSheet, Text, View, ImageBackground } from 'react-native';
+import { Alert, Animated, Platform, Pressable, StyleSheet, Text, TextInput, View, ImageBackground } from 'react-native';
 import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
@@ -22,28 +22,10 @@ import { defaultPlans } from '@/data/presets';
 
 const TRANSITION_SECONDS = 5;
 
-// v0.23 语音工具：阿拉伯数字 → 汉字，防止 TTS 把 "3" 读成 "three" / 走调
-// 覆盖 0-99（训练倒数最多到几十；> 99 罕见，原文兜底）
-const DIGIT_CHAR = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
-function numToChinese(n: number): string {
-  if (n < 0 || n > 99 || !Number.isInteger(n)) return String(n);
-  if (n < 10) return DIGIT_CHAR[n];
-  if (n === 10) return '十';
-  const tens = Math.floor(n / 10);
-  const ones = n % 10;
-  const tensPart = tens === 1 ? '十' : DIGIT_CHAR[tens] + '十';
-  return ones === 0 ? tensPart : tensPart + DIGIT_CHAR[ones];
-}
-function toChinesePronunciation(text: string): string {
-  // 把所有 0-99 的数字 token 替换成汉字（包含纯数字串 + 句子里的独立数字）
-  // 例：'3' → '三'；'15' → '十五'；'第 2 组' → '第 二 组'
-  return text.replace(/\d+/g, (m) => {
-    const n = parseInt(m, 10);
-    return n >= 0 && n <= 99 ? numToChinese(n) : m;
-  });
-}
-// 普通话语音参数：pitch / rate 默认 1.0（v0.24 用户可在「我的→语音设置」自定义覆盖）
-const SPEECH_BASE_OPTIONS = { language: 'zh-CN' };
+// v0.23 语音工具已抽到 src/features/run/coachSpeech，run.tsx 只保留副作用相关的 ref/effect
+import { numToChinese, toChinesePronunciation, SPEECH_BASE_OPTIONS } from '@/features/run/coachSpeech';
+// v0.44 高频短句改走本地 m4a，绕开 Android 系统 TTS 的机械音
+import { playClip, digitToClip, unloadCoachAudio, type CoachClipName } from '@/features/run/coachAudio';
 
 const CATEGORY_EMOJI: Record<string, string> = {
   tech: '🏸',
@@ -114,6 +96,8 @@ export default function TrainingRunScreen() {
 
   // 完成态：连续天数预告 + 徽章入场动画
   const [streakPreview, setStreakPreview] = useState<number | null>(null);
+  // 结算页 inline 备注：训练结束后零跳转就能写一行心得，提升备注写入率
+  const [quickNote, setQuickNote] = useState('');
   const badgeAnim = useRef(new Animated.Value(0)).current; // 0→1 用于 scale+opacity
 
   // idle 态：副标题闪动 + 选中卡片缩放反馈 + 上次训练承接横幅
@@ -132,15 +116,18 @@ export default function TrainingRunScreen() {
   const zhVoiceRef = useRef<string | undefined>(undefined);
   const ttsRateRef = useRef<number>(1.0);
   const ttsPitchRef = useRef<number>(1.0);
+  // v0.44 高频短句是否走本地真人音（默认开启，用户可在「我的→🔊 语音设置」关闭）
+  const useCoachAudioRef = useRef<boolean>(true);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // 先读用户偏好（含 voice / rate / pitch）
-        const [savedVoice, savedRate, savedPitch, voices] = await Promise.all([
+        // 先读用户偏好（含 voice / rate / pitch / useCoachAudio）
+        const [savedVoice, savedRate, savedPitch, savedUseAudio, voices] = await Promise.all([
           AsyncStorage.getItem('prefs.ttsVoice'),
           AsyncStorage.getItem('prefs.ttsRate'),
           AsyncStorage.getItem('prefs.ttsPitch'),
+          AsyncStorage.getItem('prefs.useCoachAudio'),
           Speech.getAvailableVoicesAsync(),
         ]);
         if (cancelled) return;
@@ -153,6 +140,8 @@ export default function TrainingRunScreen() {
           const p = parseFloat(savedPitch);
           if (!isNaN(p) && p > 0) ttsPitchRef.current = p;
         }
+        // 缺省 true，仅当用户显式选了 '0' 才关闭
+        if (savedUseAudio === '0') useCoachAudioRef.current = false;
 
         // 验证用户选的 voice 还在列表里（系统升级可能让 id 失效）
         if (savedVoice && voices.some((v) => v.identifier === savedVoice)) {
@@ -210,6 +199,7 @@ export default function TrainingRunScreen() {
       bgmSoundRef.current?.unloadAsync().catch(() => {});
       sfxHitRef.current = null;
       sfxSqueakRef.current = null;
+      unloadCoachAudio().catch(() => {});
     };
   }, []);
 
@@ -355,11 +345,12 @@ export default function TrainingRunScreen() {
           stopTimer();
           setStatus('running');
           vibrateMedium();
-          speakRaw('开始');
+          cueClip('start', '开始');
           return 0;
         }
         // v0.25 用 speakRaw 不打断前一个字，让"四、三、二、一"在 TTS 队列里自然衔接
-        speakRaw(numToChinese(prev - 1));
+        // v0.44 4/3/2/1 改走本地真人音，速度/音色都更稳
+        cueDigit(prev - 1);
         vibrateLight();
         return prev - 1;
       });
@@ -483,6 +474,26 @@ export default function TrainingRunScreen() {
     Speech.speak(spoken, opts);
   }
 
+  // v0.44 高频短句优先走本地真人 m4a；失败 / 关闭开关时 fallback 到 TTS
+  function cueClip(name: CoachClipName, fallbackText: string) {
+    if (!useCoachAudioRef.current) {
+      speakRaw(fallbackText);
+      return;
+    }
+    playClip(name).then((ok) => {
+      if (!ok) speakRaw(fallbackText);
+    });
+  }
+  function cueDigit(n: number) {
+    const clip = digitToClip(n);
+    if (!clip) {
+      // > 20 的数字没有本地 clip，直接 TTS
+      speakRaw(numToChinese(n));
+      return;
+    }
+    cueClip(clip, numToChinese(n));
+  }
+
   function runGhostCoach(item: TrainingItem, timeLeftSec: number, elapsed: number) {
     if (timeLeftSec === 11) {
       speak('当前动作最后十秒');
@@ -517,16 +528,17 @@ export default function TrainingRunScreen() {
             const rep = Math.floor(t / repTime) + 1;
             if (rep <= reps) {
               // v0.25 次数报点用 speakRaw 不打断，TTS 队列衔接更自然
-              speakRaw(rep.toString());
+              // v0.44 1-5 走本地真人音，6+ 自动 fallback TTS
+              cueDigit(rep);
               if (item.category === 'tech' || item.category === 'match') playHit();
               if (item.category === 'footwork') playSqueak();
             }
-            if (rep === reps) setTimeout(() => speak('好，休息三十秒'), 1500);
+            if (rep === reps) setTimeout(() => cueClip('rest-30', '好，休息三十秒'), 1500);
           }
         } else {
           // 休息期：倒计时
           const restLeft = cycleTime - t;
-          if (restLeft <= 3 && restLeft > 0) speakRaw(restLeft.toString());
+          if (restLeft <= 3 && restLeft > 0) cueDigit(restLeft);
         }
         return; // 被精细正则接管后，跳过兜底逻辑
       }
@@ -549,9 +561,9 @@ export default function TrainingRunScreen() {
         } else if (t < workSec) {
           // 工作期
           const workLeft = workSec - t;
-          if (workLeft === Math.floor(workSec / 2)) speak('过半了，坚持住');
-          if (workLeft <= 3 && workLeft > 0) speakRaw(workLeft.toString());
-          if (workLeft === 1) setTimeout(() => speak('好，休息三十秒'), 1500);
+          if (workLeft === Math.floor(workSec / 2)) cueClip('keep-going', '过半了，坚持住');
+          if (workLeft <= 3 && workLeft > 0) cueDigit(workLeft);
+          if (workLeft === 1) setTimeout(() => cueClip('rest-30', '好，休息三十秒'), 1500);
           
           // 在时间组内，如果是步法，继续播报随机点
           if (workLeft > 3 && workLeft % 3 === 0 && item.name.includes('六点')) {
@@ -566,8 +578,8 @@ export default function TrainingRunScreen() {
         } else {
           // 休息期
           const restLeft = cycleTime - t;
-          if (restLeft === 10) speak('准备下一组');
-          if (restLeft <= 3 && restLeft > 0) speakRaw(restLeft.toString());
+          if (restLeft === 10) cueClip('next-set', '准备下一组');
+          if (restLeft <= 3 && restLeft > 0) cueDigit(restLeft);
         }
         return;
       }
@@ -588,14 +600,14 @@ export default function TrainingRunScreen() {
     } else if (item.category === 'tech') {
       if (timeLeftSec % 3 === 0) {
         const beat = Math.floor(elapsed / 3) % 4 + 1;
-        speakRaw(beat.toString());
+        cueDigit(beat);
         playHit();
       } else if (timeLeftSec % 20 === 0) {
         const pts = ['注意动作完整', '体会发力', '回中要快', '盯住球'];
         speak(pts[Math.floor(Math.random() * pts.length)], 1.2);
       }
     } else {
-      if (timeLeftSec % 30 === 0) speak('做得很好，继续保持');
+      if (timeLeftSec % 30 === 0) cueClip('well-done', '做得很好，继续保持');
     }
   }
 
@@ -671,7 +683,7 @@ export default function TrainingRunScreen() {
     vibrateMedium();
     if (status === 'running') {
       setStatus('paused');
-      speak('训练已暂停');
+      cueClip('paused', '训练已暂停');
     } else if (status === 'paused') {
       setStatus('running');
       speak('继续训练');
@@ -748,26 +760,26 @@ export default function TrainingRunScreen() {
             {/* 增加今天状态的调查问卷 */}
             <View style={{ marginTop: spacing.xl, width: '100%', paddingHorizontal: spacing.xl }}>
               <Text style={{ color: colors.text, textAlign: 'center', marginBottom: spacing.md, fontWeight: '600' }}>今天感觉怎么样？</Text>
-              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <View style={styles.conditionGroupWrap}>
                 <Animated.View style={{ flex: 1, transform: [{ scale: conditionScale === 1.0 ? conditionCardAnim : 1 }] }}>
                   <Pressable onPress={() => pickCondition(1.0)} style={[styles.conditionBtn, conditionScale === 1.0 && styles.conditionBtnActive]}>
                     <Text style={{ fontSize: 28 }}>💪</Text>
-                    <Text style={[styles.conditionText, conditionScale === 1.0 && { color: colors.primary }]}>满血</Text>
-                    <Text style={styles.conditionDesc}>100% 负荷</Text>
+                    <Text style={[styles.conditionText, conditionScale === 1.0 && styles.conditionTextActive]}>满血</Text>
+                    <Text style={[styles.conditionDesc, conditionScale === 1.0 && styles.conditionDescActive]}>100% 负荷</Text>
                   </Pressable>
                 </Animated.View>
                 <Animated.View style={{ flex: 1, transform: [{ scale: conditionScale === 0.75 ? conditionCardAnim : 1 }] }}>
                   <Pressable onPress={() => pickCondition(0.75)} style={[styles.conditionBtn, conditionScale === 0.75 && styles.conditionBtnActive]}>
                     <Text style={{ fontSize: 28 }}>⚡</Text>
-                    <Text style={[styles.conditionText, conditionScale === 0.75 && { color: colors.primary }]}>一般</Text>
-                    <Text style={styles.conditionDesc}>75% 负荷</Text>
+                    <Text style={[styles.conditionText, conditionScale === 0.75 && styles.conditionTextActive]}>一般</Text>
+                    <Text style={[styles.conditionDesc, conditionScale === 0.75 && styles.conditionDescActive]}>75% 负荷</Text>
                   </Pressable>
                 </Animated.View>
                 <Animated.View style={{ flex: 1, transform: [{ scale: conditionScale === 0.5 ? conditionCardAnim : 1 }] }}>
                   <Pressable onPress={() => pickCondition(0.5)} style={[styles.conditionBtn, conditionScale === 0.5 && styles.conditionBtnActive]}>
                     <Text style={{ fontSize: 28 }}>🪫</Text>
-                    <Text style={[styles.conditionText, conditionScale === 0.5 && { color: colors.primary }]}>疲惫</Text>
-                    <Text style={styles.conditionDesc}>50% 负荷</Text>
+                    <Text style={[styles.conditionText, conditionScale === 0.5 && styles.conditionTextActive]}>疲惫</Text>
+                    <Text style={[styles.conditionDesc, conditionScale === 0.5 && styles.conditionDescActive]}>50% 负荷</Text>
                   </Pressable>
                 </Animated.View>
               </View>
@@ -861,16 +873,43 @@ export default function TrainingRunScreen() {
               <Text style={styles.streakPreview}>🔥 今日打卡后将达到 {streakPreview} 天连续</Text>
             )}
 
+            <View style={styles.quickNoteWrap}>
+              <Text style={styles.quickNoteLabel}>✏️ 留个心得（可选）</Text>
+              <TextInput
+                value={quickNote}
+                onChangeText={setQuickNote}
+                placeholder="今天打得最爽的一拍 / 卡壳的地方……"
+                placeholderTextColor={colors.textDim}
+                maxLength={140}
+                style={styles.quickNoteInput}
+                returnKeyType="done"
+              />
+            </View>
+
             <Pressable
               style={[styles.startBtnBig, { backgroundColor: colors.warn }]}
               onPress={() => {
-                router.replace({ pathname: '/training/log', params: { plan_id: planId, mins: String(actualMin) } });
+                router.replace({
+                  pathname: '/training/log',
+                  params: {
+                    plan_id: planId,
+                    mins: String(actualMin),
+                    note: quickNote.trim() || undefined,
+                  },
+                });
               }}
             >
               <Text style={[styles.startBtnBigText, { color: '#000' }]}>📝 领取奖励并打卡</Text>
             </Pressable>
 
-            <Pressable onPress={restartWorkout} style={{ marginTop: spacing.md }}>
+            <Pressable
+              onPress={() => router.push('/schedule')}
+              style={({ pressed }) => [styles.scheduleLinkWrap, { opacity: pressed ? 0.6 : 1 }]}
+            >
+              <Text style={styles.scheduleLink}>📅 安排下一次训练 →</Text>
+            </Pressable>
+
+            <Pressable onPress={restartWorkout} style={{ marginTop: spacing.sm }}>
               <Text style={styles.restartLink}>再来一组同样的训练 →</Text>
             </Pressable>
           </View>
@@ -1187,10 +1226,32 @@ const styles = StyleSheet.create({
   // 触发了 child Text/emoji 不渲染的 bug（删 elevation 也没救回来），Web 表现正常。
   // 回退到 v0.39 之前的稳定基线：cardAlt 实色 + border 1px 边框。
   // "按钮和背景融合"的对比度问题暂时放弃，保住"emoji + 文字看得见"这个稳定基线优先。
-  conditionBtn: { flex: 1, alignItems: 'center', backgroundColor: colors.cardAlt, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
-  conditionBtnActive: { borderColor: colors.primary, backgroundColor: colors.cardAlt },
+  // condition 状态选择按钮：v0.43 用「外层 cardAlt 大色块 + 内层透明/选中 primary 实色」绕开
+  // v0.41 暴露的 Android elevation+rgba 触发 hardware layer 吞 emoji bug。无 rgba 无 elevation。
+  conditionGroupWrap: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    backgroundColor: colors.cardAlt,
+    padding: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  conditionBtn: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  conditionBtnActive: { borderColor: colors.primary, backgroundColor: colors.primary },
   conditionText: { color: colors.text, fontWeight: '700', fontSize: font.h3, marginTop: spacing.sm },
+  conditionTextActive: { color: '#fff' },
   conditionDesc: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
+  conditionDescActive: { color: '#fff', opacity: 0.85 },
   badgeWrap: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(245, 158, 11, 0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.warn, shadowColor: colors.warn, shadowOpacity: 0.8, shadowRadius: 20, shadowOffset: { width: 0, height: 0 } },
   summaryCard: {
     flexDirection: 'row',
@@ -1212,6 +1273,25 @@ const styles = StyleSheet.create({
   finishedQuote: { color: colors.text, fontSize: font.body, marginTop: spacing.lg, textAlign: 'center', paddingHorizontal: spacing.lg },
   streakPreview: { color: colors.primary, fontSize: font.small, marginTop: spacing.sm, fontWeight: '600' },
   restartLink: { color: colors.textDim, fontSize: font.body, fontWeight: '600' },
+  // v 结算页 inline 备注 + 留存 CTA
+  quickNoteWrap: {
+    marginTop: spacing.lg,
+    width: '100%',
+    paddingHorizontal: spacing.lg,
+  },
+  quickNoteLabel: { color: colors.textDim, fontSize: font.tiny, marginBottom: spacing.xs },
+  quickNoteInput: {
+    color: colors.text,
+    fontSize: font.body,
+    backgroundColor: colors.cardAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  scheduleLinkWrap: { marginTop: spacing.md },
+  scheduleLink: { color: colors.primary, fontSize: font.small, fontWeight: '600' },
   recentBanner: { color: colors.textDim, fontSize: font.tiny, marginBottom: spacing.sm, textAlign: 'center' },
   scaledTimeText: { color: colors.primary, fontSize: font.small, marginTop: spacing.sm, fontWeight: '600', textAlign: 'center' },
   startBtnSubText: { color: 'rgba(255,255,255,0.7)', fontSize: font.tiny, marginTop: 4, textAlign: 'center' },

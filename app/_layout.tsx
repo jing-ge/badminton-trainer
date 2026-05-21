@@ -53,6 +53,8 @@ export default function RootLayout() {
           <Stack.Screen name="about" options={{ title: '关于' }} />
           <Stack.Screen name="settings/reset" options={{ title: '清空数据' }} />
           <Stack.Screen name="settings/voice" options={{ title: '语音设置' }} />
+          <Stack.Screen name="settings/backup" options={{ title: '备份与恢复' }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

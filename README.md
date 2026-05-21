@@ -108,6 +108,30 @@ npx eas-cli build -p android --profile preview
 > Agent 协作规则详见 [`AGENTS.md`](./AGENTS.md)。
 
 <!-- ITERATION_LOG_START -->
+### v0.45.0 · 2026-05-21
+
+本轮聚焦**绕开 Android 系统 TTS 机械音 + 数据可携带**——直接消化 v0.42 留下的两个根因痛点（keystore 换签名清数据 / TTS 引擎差异）。
+
+- **教练真人音扩面（v0.44 → v0.45）**：`scripts/gen-coach-audio.sh` 用 macOS `say -v Tingting` 烘焙的本地音频从 8 条扩到 **29 条**（3 个状态短句 + 数字 0~20 + 5 句高频金句：「准备下一组 / 过半了，坚持住 / 做得很好，继续保持 / 训练已暂停 / 好，休息三十秒」）。总体积 ~296KB 常驻 bundle。
+- **coachAudio 运行时**：`src/features/run/coachAudio.ts` 重写 `CoachClipName` 联合类型 + `digitToClip(n)` 覆盖 0~20，> 20 自动 fallback TTS。进程级单例 + 整组预加载，`unloadCoachAudio` 在训练页 unmount 释放。
+- **run.tsx 6 处定串切换**：rep 完成后的「好，休息三十秒」、workLeft 过半提醒、workLeft=1 收尾、restLeft=10 切「准备下一组」、每 30s 鼓励「做得很好，继续保持」、pause 提示「训练已暂停」——全部走 `cueClip()`，失败再 fallback `speakRaw`。**用户感知到的 90% 固定文案不再受手机 TTS 引擎限制**。
+- **语音设置加教练音开关**：`app/settings/voice.tsx` 顶部 Card 加 toggle（`prefs.useCoachAudio`），试听播放真人版 5→1→开始 序列。让用户能直观对比真人音 vs 系统 TTS 的差距。
+- **备份与恢复（H）**：新建 `app/settings/backup.tsx`——一键把全量数据（9 个 prefs + 5 张 SQLite 表：training_logs / schedules / user_plans / tutorial_favorites / tutorial_views）打成 JSON，可分享到微信收藏/邮件，下次重装/换机直接粘贴 JSON 覆盖恢复。**直接对冲 v0.40 EAS 换 keystore 那种 Android 签名一变就全部清光的根本风险**。me Tab 加「💾 备份与恢复」入口；`_layout.tsx` 注册路由。
+- **版本号**：`package.json` & `app.json` 提升至 v0.45.0。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
+### v0.43.0 · 2026-05-21
+
+本轮聚焦**首启体验 + 跨页面设计语言一致性 + 长文件可维护性**，一次性清掉 5 个长期 backlog。
+
+- **强度分级统一**：4 个 Tab 之前各自用 `★/☆`、`★4/5`、emoji 不同方言显示训练强度。新增 `src/data/intensity.ts` 作为单一真源（🌿放松/🚶轻度/🏃中等/🔥高强/⚡极限 + label + desc），`(tabs)/index.tsx` 最近训练、`(tabs)/stats.tsx` 历史区、`log/[id].tsx` 详情、`training/log.tsx` 打卡选择器全部接入。废弃 `INTENSITY_LABEL` / `INTENSITY_DESC` 等局部常量。
+- **训练完成页心得 + 留存 CTA**：`app/training/run.tsx` 完成态新增 inline `TextInput`（最多 140 字，可选），用户写完后点「✅ 完成训练」会把 `note` 通过 query 直接带到 `training/log` 表单，省一次手动复制；同步加「📅 安排下一次训练 →」次级按钮拉去 `schedule`，避免训练完即弹出登录页那种留存断点。
+- **conditionBtn 对比度终修**：放弃 v0.40~v0.42 的 rgba+elevation 路线（v0.41 在 Android 触发 hardware-layer 吞 emoji bug），改用**外层 `cardAlt` 实色容器 + 内部三个 transparent button + 选中态 `primary` 实色填底 + 白字**的 group 结构。零 rgba、零 elevation、零 shadow，从根上避开 Android 合成路径 bug，同时对比度比 v0.39 基线更强。
+- **首启 onboarding (3 屏)**：`app/onboarding.tsx` 新建，进入应用先在 `(tabs)/index` 用 `isOnboardingDone()` 拦截。三屏分别是欢迎介绍 / 试听一段「准备开始训练。五。四。三。二。一。开始」/ 试震动轻中重，结束写 `prefs.onboardingDone=1`。**直接缓解 v0.40 EAS 换 keystore 后 `AsyncStorage` 被清、TTS voice 丢失的回归**——新装即引导用户进入语音设置挑 voice，杜绝默认机械 TTS。
+- **run.tsx 拆分起步**：1248 行的 `app/training/run.tsx` 太单体，本轮做最稳妥的第一步——把纯函数 `numToChinese` / `toChinesePronunciation` / `SPEECH_BASE_OPTIONS` 抽到 `src/features/run/coachSpeech.ts`（无 React state、无副作用，0 风险）。带 ref 的 `useCoachSpeech` / `useWorkoutBGM` / `useWorkoutTimer` 留下一轮再切。
+- **版本号**：`package.json` & `app.json` 提升至 v0.43.0。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.42.0 · 2026-05-17
 
 - **Android 真机紧急回退**：v0.40/v0.41 的 rgba 半透明背景 + textDim 边框方案在 Android 上让 conditionBtn 内的 emoji + 文字完全不渲染（删 elevation 也没救回来），Web 端表现正常。
