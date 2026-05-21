@@ -15,6 +15,8 @@ import {
 import { getActivePlan } from '@/db/plans';
 import { selectToday, TodaySelection } from '@/data/selectToday';
 import { vibrateLight, vibrateHeavy } from '@/utils/haptics';
+import { getIntensityMeta } from '@/data/intensity';
+import { isOnboardingDone } from '../onboarding';
 import {
   StreakBadgeCard,
   type StreakStats,
@@ -50,6 +52,12 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       (async () => {
+        // 首次进入应用：未完成 onboarding 直接跳走，不渲染首页
+        const done = await isOnboardingDone();
+        if (!done) {
+          router.replace('/onboarding' as never);
+          return;
+        }
         const plan = await getActivePlan();
         setToday(selectToday(plan));
         const stats = await getStreakStats();
@@ -293,7 +301,7 @@ export default function HomeScreen() {
       {recent.length > 0 && (
         <Section title="最近训练">
           {recent.map((r, idx) => {
-            const stars = Math.max(0, Math.min(5, r.intensity));
+            const intensityMeta = getIntensityMeta(r.intensity);
             // 仅第一条、且与第二条非同日时显示"上次对照"
             let diffText: string | null = null;
             let diffColor: string = colors.textDim;
@@ -341,10 +349,10 @@ export default function HomeScreen() {
                         </Text>
                       )}
                     </View>
-                    <Text style={styles.intensity}>
-                      {'★'.repeat(stars)}
-                      {'☆'.repeat(5 - stars)}
-                    </Text>
+                    <View style={styles.intensityCol}>
+                      <Text style={styles.intensityEmoji}>{intensityMeta.emoji}</Text>
+                      <Text style={styles.intensityLabel}>{intensityMeta.label}</Text>
+                    </View>
                     <Text style={{ color: colors.textDim, fontSize: 22 }}>›</Text>
                   </View>
                 </Card>
@@ -415,7 +423,9 @@ const styles = StyleSheet.create({
   },
   recentDate: { color: colors.text, fontWeight: '600' },
   recentMeta: { color: colors.textDim, fontSize: font.small, marginTop: 2 },
-  intensity: { color: colors.warn, fontSize: 14 },
+  intensityCol: { alignItems: 'center', minWidth: 44 },
+  intensityEmoji: { fontSize: 22 },
+  intensityLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 2 },
   // v0.19 今日训练卡新样式
   sourceRow: { marginBottom: 6 },
   sourceLabel: { fontSize: font.small, fontWeight: '700' },

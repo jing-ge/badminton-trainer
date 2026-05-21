@@ -21,24 +21,21 @@ const CAT_META: Record<string, { emoji: string; color: string }> = {
 const ALL_CATS = Object.keys(CAT_META);
 const QUICK_MINS = [30, 60, 90, 120];
 
-// 训练强度 1-5 私教语言
-const INTENSITY_DESC = [
-  { emoji: '😌', label: '轻松散练' },
-  { emoji: '🙂', label: '节奏适中' },
-  { emoji: '💪', label: '标准训练' },
-  { emoji: '🔥', label: '高强度' },
-  { emoji: '⚡', label: '极限挑战' },
-];
+import { INTENSITY_META, getIntensityMeta, type IntensityLevel } from '@/data/intensity';
 
 const NOTE_MAX = 200;
 
 export default function TrainingLogScreen() {
-  const { plan_id, mins } = useLocalSearchParams<{ plan_id?: string; mins?: string }>();
+  const { plan_id, mins, note: noteFromQuery } = useLocalSearchParams<{
+    plan_id?: string;
+    mins?: string;
+    note?: string;
+  }>();
   const router = useRouter();
   const [duration, setDuration] = useState(mins ?? '60');
   const [intensity, setIntensity] = useState(3);
   const [cats, setCats] = useState<string[]>([]);
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(noteFromQuery ?? '');
 
   const [opponent, setOpponent] = useState('');
   const [matchResult, setMatchResult] = useState<'win' | 'loss' | 'draw' | undefined>();
@@ -124,7 +121,7 @@ export default function TrainingLogScreen() {
     });
   }
 
-  const intensityInfo = INTENSITY_DESC[intensity - 1];
+  const intensityInfo = getIntensityMeta(intensity);
 
   return (
     <Screen>
@@ -171,17 +168,38 @@ export default function TrainingLogScreen() {
       <Card style={{ marginTop: spacing.md }}>
         <Text style={styles.label}>训练强度</Text>
         <View style={styles.starsRow}>
-          {[1, 2, 3, 4, 5].map((n) => (
-            <Pressable key={n} onPress={() => setIntensity(n)}>
-              <Text style={[styles.star, { color: n <= intensity ? colors.warn : colors.border }]}>
-                ★
-              </Text>
-            </Pressable>
-          ))}
+          {([1, 2, 3, 4, 5] as IntensityLevel[]).map((n) => {
+            const active = n === intensity;
+            const meta = INTENSITY_META[n];
+            return (
+              <Pressable
+                key={n}
+                onPress={() => setIntensity(n)}
+                style={[
+                  styles.intensityChip,
+                  active && {
+                    backgroundColor: colors.cardAlt,
+                    borderColor: colors.warn,
+                  },
+                ]}
+              >
+                <Text style={[styles.intensityChipEmoji, !active && { opacity: 0.45 }]}>
+                  {meta.emoji}
+                </Text>
+                <Text
+                  style={[
+                    styles.intensityChipLabel,
+                    { color: active ? colors.warn : colors.textDim },
+                  ]}
+                >
+                  {meta.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
         <Text style={styles.intensityDesc}>
-          <Text style={{ fontSize: 18 }}>{intensityInfo.emoji}</Text>{'  '}
-          <Text style={styles.intensityLabel}>{intensityInfo.label}</Text>
+          <Text style={styles.intensityLabel}>{intensityInfo.desc}</Text>
         </Text>
       </Card>
 
@@ -267,8 +285,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  starsRow: { flexDirection: 'row', gap: spacing.md },
-  star: { fontSize: 32 },
+  starsRow: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },
+  intensityChip: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+  },
+  intensityChipEmoji: { fontSize: 24 },
+  intensityChipLabel: { fontSize: font.tiny, fontWeight: '700', marginTop: 2 },
   intensityDesc: { marginTop: spacing.md, color: colors.textDim },
   intensityLabel: { color: colors.text, fontSize: font.body, fontWeight: '600' },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },

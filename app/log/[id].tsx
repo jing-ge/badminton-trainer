@@ -23,14 +23,7 @@ const RESULT_META: Record<NonNullable<TrainingLog['match_result']>, { emoji: str
   draw: { emoji: '🤝', label: '平', color: colors.warn },
 };
 
-// 强度档位语义（1-5）
-const INTENSITY_LABEL: Record<number, string> = {
-  1: '放松活动',
-  2: '轻度',
-  3: '中等',
-  4: '高强度',
-  5: '极限',
-};
+import { getIntensityMeta } from '@/data/intensity';
 
 // 「回顾」派生数据：纯文字小行
 type ReviewLine = { key: string; text: string; color: string };
@@ -236,15 +229,14 @@ export default function TrainingLogDetail() {
               { flex: 1, alignItems: 'flex-end', opacity: pressed ? 0.6 : 1 },
             ]}
           >
-            <Text style={styles.coreStar}>
-              {'★'.repeat(log.intensity)}
-              <Text style={{ color: colors.border }}>{'☆'.repeat(5 - log.intensity)}</Text>
+            <Text style={styles.coreEmoji}>{getIntensityMeta(log.intensity).emoji}</Text>
+            <Text style={styles.coreLabel}>
+              {getIntensityMeta(log.intensity).label} · {log.intensity}/5
             </Text>
-            <Text style={styles.coreLabel}>强度 {log.intensity}/5</Text>
           </Pressable>
         </View>
         <Text style={styles.intensityHint}>
-          {log.intensity}={INTENSITY_LABEL[log.intensity] ?? '—'}
+          {getIntensityMeta(log.intensity).desc}
         </Text>
       </Card>
 
@@ -360,7 +352,7 @@ const styles = StyleSheet.create({
 
   coreRow: { flexDirection: 'row', alignItems: 'center' },
   coreValue: { color: colors.primary, fontSize: 40, fontWeight: '800', lineHeight: 44 },
-  coreStar: { color: colors.warn, fontSize: 22, fontWeight: '700' },
+  coreEmoji: { fontSize: 36 },
   coreLabel: { color: colors.textDim, fontSize: font.small, marginTop: 4 },
   divider: { width: 1, height: 40, backgroundColor: colors.border, marginHorizontal: spacing.md },
   intensityHint: {

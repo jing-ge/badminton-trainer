@@ -25,15 +25,7 @@ const HISTORY_INITIAL = 20;
 // 历史区筛选 Pill 类型
 type HistoryFilter = 'all' | 'training' | 'match' | 'high' | 'note';
 
-// 强度档位元信息(emoji + 2 字标签):语义对齐 /log/[id] 的 INTENSITY_LABEL,
-// 不直接 import 私有常量,这里内联保留 stats 自治
-const INTENSITY_META: Record<number, { emoji: string; label: string }> = {
-  1: { emoji: '🌿', label: '放松' },
-  2: { emoji: '🚶', label: '轻度' },
-  3: { emoji: '🏃', label: '中等' },
-  4: { emoji: '🔥', label: '高强' },
-  5: { emoji: '⚡', label: '极限' },
-};
+import { getIntensityMeta } from '@/data/intensity';
 
 const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -508,7 +500,7 @@ export default function StatsScreen() {
                           : l.match_result === 'draw'
                           ? '🤝'
                           : '';
-                      const intensityMeta = INTENSITY_META[l.intensity] ?? INTENSITY_META[3];
+                      const intensityMeta = getIntensityMeta(l.intensity);
                       return (
                         <Pressable
                           key={l.id}
