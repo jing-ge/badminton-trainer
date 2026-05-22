@@ -19,6 +19,7 @@ README 引用的截图都是真实渲染产物——通过 `npx expo start --web
 | `voice.png` | `app/settings/voice.tsx` | 语音设置：教练真人音 toggle + 语速/音调 ± + 12 个普通话 voice 列表 |
 | `backup.png` | `app/settings/backup.tsx` | 备份与恢复：当前数据 6 项统计 + 1️⃣ 导出 + 2️⃣ 恢复（红色覆盖按钮） |
 | `schedule.png` | `app/schedule/index.tsx` | 日程提醒：星期 / 时间 chip + 19:00 输入 + 添加+测试通知 + 空态预设引导 |
+| `onboarding.png` | `app/onboarding.tsx` | 首启引导：🏸 球拍 hero + 「30 秒带你跑通三件最重要的事」+ 进度点 1/3 |
 
 ## 重新生成
 

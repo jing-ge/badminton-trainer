@@ -58,7 +58,7 @@
     <td align="center"><img src="docs/screenshots/voice.png" alt="语音设置"/><br><sub>⑨ 设置 · 教练真人音</sub></td>
     <td align="center"><img src="docs/screenshots/backup.png" alt="备份恢复"/><br><sub>⑩ 设置 · 一键 JSON 备份</sub></td>
     <td align="center"><img src="docs/screenshots/schedule.png" alt="日程提醒"/><br><sub>⑪ 设置 · 训练日程</sub></td>
-    <td></td>
+    <td align="center"><img src="docs/screenshots/onboarding.png" alt="首启引导"/><br><sub>⑫ 首启 · 30 秒上手</sub></td>
   </tr>
 </table>
 
