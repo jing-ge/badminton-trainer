@@ -108,6 +108,16 @@ npx eas-cli build -p android --profile preview
 > Agent 协作规则详见 [`AGENTS.md`](./AGENTS.md)。
 
 <!-- ITERATION_LOG_START -->
+### v0.48.0 · 2026-05-22
+
+修 v0.47 真机截图发现的 condition 三按钮空白 bug——v0.45 误把 v0.42 紧急修复回退了，又踩 Android hardware layer 吞 emoji+文字的同一个雷。
+
+- **三按钮空白根因**：v0.45 把 conditionGroupWrap 改成「外层 cardAlt + 内层 transparent + 选中态 primary 实色填充 + Animated.View native-driver scale 反馈」嵌套结构。MIUI 真机上不同色嵌套背景叠加 useNativeDriver transform 触发硬件层吞子节点 Text/emoji——3 个按钮全部变空白胶囊。
+- **完整回退到 v0.42 单层基线**：内层 cardAlt 实色 + 1px border、padding 单值，选中只换边框不换背景，文字色由 white 改回 primary。conditionGroupWrap 退化为纯 flex row + gap，扔掉外层色块。
+- **删除 Animated.View scale 包装**：3 个 `<Animated.View transform=[scale]>` + conditionCardAnim useRef + Animated.sequence 一并清掉。代价是失去选中卡片的 1.0→1.08→1.0 弹性反馈，换 emoji+文字必然可见。
+- **样式块注释升级为血泪 5 条**：v0.41/v0.42/v0.45/v0.48 时间线 + 守则「不要再叠嵌套背景层和 native-driver transform」，避免下一个迭代再次中招。
+- **typecheck**：✅ tsc --noEmit 通过；diff 净减 18 行（46-/28+），改动只触 run.tsx 单文件。
+
 ### v0.47.0 · 2026-05-22
 
 本轮修 v0.46 真机截图暴露的 3 个布局根因——header 与内容之间的 ~80px 空白带、新用户三张卡 CTA 重复。

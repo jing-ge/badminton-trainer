@@ -100,9 +100,8 @@ export default function TrainingRunScreen() {
   const [quickNote, setQuickNote] = useState('');
   const badgeAnim = useRef(new Animated.Value(0)).current; // 0→1 用于 scale+opacity
 
-  // idle 态：副标题闪动 + 选中卡片缩放反馈 + 上次训练承接横幅
+  // idle 态：副标题闪动 + 上次训练承接横幅
   const subtitleAnim = useRef(new Animated.Value(1)).current;
-  const conditionCardAnim = useRef(new Animated.Value(1)).current;
   const [recentBanner, setRecentBanner] = useState<string | null>(null);
 
   // 背景音乐和音效引用
@@ -295,12 +294,6 @@ export default function TrainingRunScreen() {
       duration: 180,
       useNativeDriver: true,
     }).start();
-    // 选中卡片 scale 反馈 1.0→1.08→1.0,共 220ms
-    conditionCardAnim.setValue(1);
-    Animated.sequence([
-      Animated.timing(conditionCardAnim, { toValue: 1.08, duration: 110, useNativeDriver: true }),
-      Animated.timing(conditionCardAnim, { toValue: 1, duration: 110, useNativeDriver: true }),
-    ]).start();
   }
 
   useEffect(() => {
@@ -761,27 +754,21 @@ export default function TrainingRunScreen() {
             <View style={{ marginTop: spacing.xl, width: '100%', paddingHorizontal: spacing.xl }}>
               <Text style={{ color: colors.text, textAlign: 'center', marginBottom: spacing.md, fontWeight: '600' }}>今天感觉怎么样？</Text>
               <View style={styles.conditionGroupWrap}>
-                <Animated.View style={{ flex: 1, transform: [{ scale: conditionScale === 1.0 ? conditionCardAnim : 1 }] }}>
-                  <Pressable onPress={() => pickCondition(1.0)} style={[styles.conditionBtn, conditionScale === 1.0 && styles.conditionBtnActive]}>
-                    <Text style={{ fontSize: 28 }}>💪</Text>
-                    <Text style={[styles.conditionText, conditionScale === 1.0 && styles.conditionTextActive]}>满血</Text>
-                    <Text style={[styles.conditionDesc, conditionScale === 1.0 && styles.conditionDescActive]}>100% 负荷</Text>
-                  </Pressable>
-                </Animated.View>
-                <Animated.View style={{ flex: 1, transform: [{ scale: conditionScale === 0.75 ? conditionCardAnim : 1 }] }}>
-                  <Pressable onPress={() => pickCondition(0.75)} style={[styles.conditionBtn, conditionScale === 0.75 && styles.conditionBtnActive]}>
-                    <Text style={{ fontSize: 28 }}>⚡</Text>
-                    <Text style={[styles.conditionText, conditionScale === 0.75 && styles.conditionTextActive]}>一般</Text>
-                    <Text style={[styles.conditionDesc, conditionScale === 0.75 && styles.conditionDescActive]}>75% 负荷</Text>
-                  </Pressable>
-                </Animated.View>
-                <Animated.View style={{ flex: 1, transform: [{ scale: conditionScale === 0.5 ? conditionCardAnim : 1 }] }}>
-                  <Pressable onPress={() => pickCondition(0.5)} style={[styles.conditionBtn, conditionScale === 0.5 && styles.conditionBtnActive]}>
-                    <Text style={{ fontSize: 28 }}>🪫</Text>
-                    <Text style={[styles.conditionText, conditionScale === 0.5 && styles.conditionTextActive]}>疲惫</Text>
-                    <Text style={[styles.conditionDesc, conditionScale === 0.5 && styles.conditionDescActive]}>50% 负荷</Text>
-                  </Pressable>
-                </Animated.View>
+                <Pressable onPress={() => pickCondition(1.0)} style={[styles.conditionBtn, conditionScale === 1.0 && styles.conditionBtnActive]}>
+                  <Text style={{ fontSize: 28 }}>💪</Text>
+                  <Text style={[styles.conditionText, conditionScale === 1.0 && styles.conditionTextActive]}>满血</Text>
+                  <Text style={[styles.conditionDesc, conditionScale === 1.0 && styles.conditionDescActive]}>100% 负荷</Text>
+                </Pressable>
+                <Pressable onPress={() => pickCondition(0.75)} style={[styles.conditionBtn, conditionScale === 0.75 && styles.conditionBtnActive]}>
+                  <Text style={{ fontSize: 28 }}>⚡</Text>
+                  <Text style={[styles.conditionText, conditionScale === 0.75 && styles.conditionTextActive]}>一般</Text>
+                  <Text style={[styles.conditionDesc, conditionScale === 0.75 && styles.conditionDescActive]}>75% 负荷</Text>
+                </Pressable>
+                <Pressable onPress={() => pickCondition(0.5)} style={[styles.conditionBtn, conditionScale === 0.5 && styles.conditionBtnActive]}>
+                  <Text style={{ fontSize: 28 }}>🪫</Text>
+                  <Text style={[styles.conditionText, conditionScale === 0.5 && styles.conditionTextActive]}>疲惫</Text>
+                  <Text style={[styles.conditionDesc, conditionScale === 0.5 && styles.conditionDescActive]}>50% 负荷</Text>
+                </Pressable>
               </View>
             </View>
 
@@ -1222,36 +1209,31 @@ const styles = StyleSheet.create({
   roundSmallBtn: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
   iconBtnLabel: { color: colors.textDim, fontSize: font.tiny, marginTop: 8 },
   playPauseBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-  // v0.42 紧急回退：v0.40/v0.41 用 rgba 半透明背景 + 2px textDim 边框在 Android 真机上
-  // 触发了 child Text/emoji 不渲染的 bug（删 elevation 也没救回来），Web 表现正常。
-  // 回退到 v0.39 之前的稳定基线：cardAlt 实色 + border 1px 边框。
-  // "按钮和背景融合"的对比度问题暂时放弃，保住"emoji + 文字看得见"这个稳定基线优先。
-  // condition 状态选择按钮：v0.43 用「外层 cardAlt 大色块 + 内层透明/选中 primary 实色」绕开
-  // v0.41 暴露的 Android elevation+rgba 触发 hardware layer 吞 emoji bug。无 rgba 无 elevation。
+  // condition 三按钮历史血泪：Android (MIUI) 真机上凡是「不同色嵌套背景 / rgba bg / Animated.View
+  // useNativeDriver transform」就会触发 hardware layer 吞 child Text+emoji。Web/iOS 都正常。
+  // - v0.41 引入 rgba bg + 2px border 中招（删 elevation 也没救回来）
+  // - v0.42 紧急回退到 cardAlt 实色 + 1px border 单层
+  // - v0.45 又改成「外层 cardAlt + 内层 transparent + 选中 primary 填充 + Animated.View scale」二次中招
+  // - v0.48 再次回退到 v0.42 单层基线，扔掉 Animated.View 缩放反馈
+  // 守则：保住 emoji + 文字看得见 优先，不要再叠嵌套背景层和 native-driver transform。
   conditionGroupWrap: {
     flexDirection: 'row',
     gap: spacing.sm,
-    backgroundColor: colors.cardAlt,
-    padding: spacing.sm,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   conditionBtn: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: 'transparent',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.cardAlt,
+    padding: spacing.md,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  conditionBtnActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+  conditionBtnActive: { borderColor: colors.primary, backgroundColor: colors.cardAlt },
   conditionText: { color: colors.text, fontWeight: '700', fontSize: font.h3, marginTop: spacing.sm },
-  conditionTextActive: { color: '#fff' },
+  conditionTextActive: { color: colors.primary },
   conditionDesc: { color: colors.textDim, fontSize: font.tiny, marginTop: 4 },
-  conditionDescActive: { color: '#fff', opacity: 0.85 },
+  conditionDescActive: { color: colors.primary, opacity: 0.85 },
   badgeWrap: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(245, 158, 11, 0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.warn, shadowColor: colors.warn, shadowOpacity: 0.8, shadowRadius: 20, shadowOffset: { width: 0, height: 0 } },
   summaryCard: {
     flexDirection: 'row',
