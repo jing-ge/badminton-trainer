@@ -43,22 +43,22 @@
 
 <table>
   <tr>
-    <td align="center" width="25%"><img src="docs/screenshots/home.png" alt="首页"/><br><sub>① 首页 · 私教任务卡</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/train-weekly.png" alt="训练 Tab"/><br><sub>② 训练 · 周历模式</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/run-idle.png" alt="训练执行"/><br><sub>③ 训练执行 · 体能 idle</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/stats-period.png" alt="记录顶部"/><br><sub>④ 记录 · 时间舱</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/onboarding.png" alt="首启引导"/><br><sub>① 首启 · 30 秒上手</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/home.png" alt="首页"/><br><sub>② 首页 · 私教任务卡</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/train-weekly.png" alt="训练 Tab"/><br><sub>③ 训练 · 周历模式</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/run-idle.png" alt="训练执行"/><br><sub>④ 训练执行 · 体能 idle</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/stats-history.png" alt="记录滚到底"/><br><sub>⑤ 记录 · 90 天热力图</sub></td>
-    <td align="center"><img src="docs/screenshots/library.png" alt="教程列表"/><br><sub>⑥ 教程 · 分类 + 收藏</sub></td>
-    <td align="center"><img src="docs/screenshots/tutorial-detail.png" alt="教程详情"/><br><sub>⑦ 教程 · 2.5D 鹰眼 + 握拍</sub></td>
-    <td align="center"><img src="docs/screenshots/me.png" alt="我的"/><br><sub>⑧ 我的 · 私教档案</sub></td>
+    <td align="center"><img src="docs/screenshots/stats-period.png" alt="记录顶部"/><br><sub>⑤ 记录 · 时间舱</sub></td>
+    <td align="center"><img src="docs/screenshots/stats-history.png" alt="记录滚到底"/><br><sub>⑥ 记录 · 90 天热力图</sub></td>
+    <td align="center"><img src="docs/screenshots/library.png" alt="教程列表"/><br><sub>⑦ 教程 · 分类 + 收藏</sub></td>
+    <td align="center"><img src="docs/screenshots/tutorial-detail.png" alt="教程详情"/><br><sub>⑧ 教程 · 2.5D 鹰眼 + 握拍</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/voice.png" alt="语音设置"/><br><sub>⑨ 设置 · 教练真人音</sub></td>
-    <td align="center"><img src="docs/screenshots/backup.png" alt="备份恢复"/><br><sub>⑩ 设置 · 一键 JSON 备份</sub></td>
-    <td align="center"><img src="docs/screenshots/schedule.png" alt="日程提醒"/><br><sub>⑪ 设置 · 训练日程</sub></td>
-    <td align="center"><img src="docs/screenshots/onboarding.png" alt="首启引导"/><br><sub>⑫ 首启 · 30 秒上手</sub></td>
+    <td align="center"><img src="docs/screenshots/me.png" alt="我的"/><br><sub>⑨ 我的 · 私教档案</sub></td>
+    <td align="center"><img src="docs/screenshots/voice.png" alt="语音设置"/><br><sub>⑩ 设置 · 教练真人音</sub></td>
+    <td align="center"><img src="docs/screenshots/backup.png" alt="备份恢复"/><br><sub>⑪ 设置 · 一键 JSON 备份</sub></td>
+    <td align="center"><img src="docs/screenshots/schedule.png" alt="日程提醒"/><br><sub>⑫ 设置 · 训练日程</sub></td>
   </tr>
 </table>
 
