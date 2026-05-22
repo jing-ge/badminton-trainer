@@ -108,6 +108,16 @@ npx eas-cli build -p android --profile preview
 > Agent 协作规则详见 [`AGENTS.md`](./AGENTS.md)。
 
 <!-- ITERATION_LOG_START -->
+### v0.47.0 · 2026-05-22
+
+本轮修 v0.46 真机截图暴露的 3 个布局根因——header 与内容之间的 ~80px 空白带、新用户三张卡 CTA 重复。
+
+- **Screen 安全区双重计算**：`src/components/Screen.tsx` 默认 `edges={['top', 'bottom']}` 让 SafeAreaView 又吃了一遍 top inset，而 Stack/Tabs 的 header 已经处理过——叠加出 ~80px 空白带。改默认 `edges={['bottom']}`，新增 `topEdge` opt-in prop。`onboarding.tsx` / `training/run.tsx`（5 处）显式传 `topEdge`（这两屏 `headerShown: false`），其余 22 处用默认。**全 app 顶部空白带消失，每屏多出 ~80px 真实内容**。
+- **新用户 streak card 隐藏**：`(tabs)/index.tsx` 当 `daysSinceLast === -1`（从未打卡）时不渲染 `StreakBadgeCard`——F 状态「还没开始连击」对全新用户是噪音，且与下方 welcome / 主 today 卡的 CTA 重复。省 ~80px。
+- **welcome 卡仅 fallback 渲染**：原条件 `daysSinceLast === -1` 改为 `daysSinceLast === -1 && !today`——有 plan 时主"今日训练"卡已经承担 CTA，welcome 仅在无 plan 兜底时出现。省 ~150px。
+- **效果**：新用户首屏从 `header + 空白带 + streak F + welcome + 主卡` 五块压到 `header + hero + 主"今日训练"卡`，第一屏直接看到完整训练入口。
+- **typecheck**：✅ `tsc --noEmit` 通过
+
 ### v0.46.0 · 2026-05-21
 
 本轮聚焦**首页上半部分瘦身**——hero + StreakBadgeCard 之前占去近 200px 把今日训练卡推到折叠线下，小屏机看不到「开始训练」按钮。

@@ -53,7 +53,7 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} topEdge>
       <View style={styles.progressRow}>
         {[0, 1, 2].map((i) => (
           <View

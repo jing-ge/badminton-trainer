@@ -125,7 +125,7 @@ export default function HomeScreen() {
         <Text style={styles.date}>{dayjs().format('M 月 D 日 dddd')}</Text>
       </View>
 
-      {streakStats && (
+      {streakStats && daysSinceLast !== -1 && (
         <StreakBadgeCard
           stats={streakStats}
           onPressCta={() => router.push('/training/log')}
@@ -145,8 +145,8 @@ export default function HomeScreen() {
           </Pressable>
         }
       >
-        {/* 首启新用户：欢迎卡（已加载、且从未训练过） */}
-        {loaded && daysSinceLast === -1 && (
+        {/* 首启新用户：欢迎卡（仅当没有 today 数据兜底时显示，避免和主"今日训练"卡 CTA 重复） */}
+        {loaded && daysSinceLast === -1 && !today && (
           <Card
             style={{
               marginBottom: spacing.md,

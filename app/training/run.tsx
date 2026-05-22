@@ -718,7 +718,7 @@ export default function TrainingRunScreen() {
   }
 
   if (items.length === 0) {
-    return <Screen><Text style={{ color: colors.textDim }}>没有训练项</Text></Screen>;
+    return <Screen topEdge><Text style={{ color: colors.textDim }}>没有训练项</Text></Screen>;
   }
 
   if (status === 'idle') {
@@ -740,7 +740,7 @@ export default function TrainingRunScreen() {
           : '（按 50% 强度执行）';
     return (
       <View style={{ flex: 1 }}>
-        <Screen scroll={false} transparent={true}>
+        <Screen scroll={false} transparent={true} topEdge>
           <WorkoutBackground />
           <View style={styles.topBar}>
             <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
@@ -799,7 +799,7 @@ export default function TrainingRunScreen() {
     const currentItem = items[currentIndex];
     return (
       <View style={{ flex: 1 }}>
-        <Screen scroll={false} transparent={true}>
+        <Screen scroll={false} transparent={true} topEdge>
           <WorkoutBackground />
           <View style={[styles.centerWrap, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
             <Text style={{ color: colors.primary, fontSize: font.h2, fontWeight: '700', marginBottom: spacing.lg }}>准备动作</Text>
@@ -826,7 +826,7 @@ export default function TrainingRunScreen() {
 
     return (
       <View style={{ flex: 1 }}>
-        <Screen scroll={false} transparent={true}>
+        <Screen scroll={false} transparent={true} topEdge>
           <WorkoutBackground />
           <View style={styles.topBar}>
             <Pressable onPress={() => router.back()} style={styles.navBackBtn}>
