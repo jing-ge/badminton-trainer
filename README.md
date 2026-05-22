@@ -58,9 +58,11 @@
     <td align="center"><img src="docs/screenshots/voice.png" alt="语音设置"/><br><sub>⑨ 设置 · 教练真人音</sub></td>
     <td align="center"><img src="docs/screenshots/backup.png" alt="备份恢复"/><br><sub>⑩ 设置 · 一键 JSON 备份</sub></td>
     <td align="center"><img src="docs/screenshots/schedule.png" alt="日程提醒"/><br><sub>⑪ 设置 · 训练日程</sub></td>
-    <td align="center" valign="middle"><sub>截图来自 Web 端 414×896@2x 移动视口，深色主题。<br/>运行 <code>node scripts/capture-screenshots.mjs</code> 一键重新生成。</sub></td>
+    <td></td>
   </tr>
 </table>
+
+<sub>截图来自 Web 端 414×896@2x 移动视口，深色主题。运行 <code>node scripts/capture-screenshots.mjs</code> 一键重新生成。</sub>
 
 ---
 
